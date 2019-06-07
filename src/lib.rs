@@ -1,6 +1,5 @@
-mod header;
+#[cfg(test)]
+mod tests;
 
-#[test]
-fn test() {
-    assert!(true);
-}
+mod header;
+pub use header::{Header, ReadHeader};

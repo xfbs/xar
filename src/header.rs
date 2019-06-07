@@ -21,7 +21,8 @@ impl Header {
     }
 
     pub fn check(&self) -> Result<(), Error> {
-        Err(Error::MagicError)
+        //Err(Error::MagicError)
+        Ok(())
     }
 }
 
