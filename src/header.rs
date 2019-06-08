@@ -4,6 +4,7 @@ use std::io::Cursor;
 #[derive(Debug, PartialEq)]
 pub enum Error {
     MagicError,
+    VersionError,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -38,6 +39,10 @@ impl Header {
     pub fn check(&self) -> Result<(), Error> {
         if self.magic != 0x78617221 {
             return Err(Error::MagicError);
+        }
+
+        if self.version != 1 {
+            return Err(Error::VersionError);
         }
 
         Ok(())
