@@ -1,5 +1,5 @@
-use std::io::Cursor;
 use byteorder::{BigEndian, ReadBytesExt};
+use std::io::Cursor;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
@@ -17,8 +17,22 @@ pub struct Header {
 }
 
 impl Header {
-    pub fn new(magic: u32, size: u16, version: u16, toc_length_compressed: u64, toc_length_uncompressed: u64, checksum_alg: u32) -> Header {
-        Header { magic, size, version, toc_length_compressed, toc_length_uncompressed, checksum_alg }
+    pub fn new(
+        magic: u32,
+        size: u16,
+        version: u16,
+        toc_length_compressed: u64,
+        toc_length_uncompressed: u64,
+        checksum_alg: u32,
+    ) -> Header {
+        Header {
+            magic,
+            size,
+            version,
+            toc_length_compressed,
+            toc_length_uncompressed,
+            checksum_alg,
+        }
     }
 
     pub fn check(&self) -> Result<(), Error> {
@@ -34,7 +48,10 @@ pub trait ReadHeader {
     fn read_header(&mut self) -> Result<Header, std::io::Error>;
 }
 
-impl<T> ReadHeader for T where T: ReadBytesExt {
+impl<T> ReadHeader for T
+where
+    T: ReadBytesExt,
+{
     fn read_header(&mut self) -> Result<Header, std::io::Error> {
         let magic = self.read_u32::<BigEndian>()?;
         let size = self.read_u16::<BigEndian>()?;
@@ -43,6 +60,13 @@ impl<T> ReadHeader for T where T: ReadBytesExt {
         let toc_length_uncompressed = self.read_u64::<BigEndian>()?;
         let checksum_alg = self.read_u32::<BigEndian>()?;
 
-        Ok(Header { magic, size, version, toc_length_compressed, toc_length_uncompressed, checksum_alg })
+        Ok(Header {
+            magic,
+            size,
+            version,
+            toc_length_compressed,
+            toc_length_uncompressed,
+            checksum_alg,
+        })
     }
 }
