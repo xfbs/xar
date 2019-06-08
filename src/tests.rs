@@ -1,4 +1,5 @@
 use crate::{Header, ReadHeader};
+use crate::header;
 use std::io::Cursor;
 
 const NULL_XAR: &'static [u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/null.xar"));
@@ -10,4 +11,15 @@ fn test_can_load_header() {
     let header = cursor.read_header().unwrap();
 
     assert!(header.check().is_ok());
+}
+
+#[test]
+fn test_header_load_fails_with_invalid_magic() {
+    for i in 0..4 {
+        let mut copy: Vec<u8> = NULL_XAR.into();
+        copy[i] = copy[i] + 1;
+        let mut cursor = Cursor::new(&copy);
+        let header = cursor.read_header().unwrap();
+        assert_eq!(header.check(), Err(header::Error::MagicError));
+    }
 }

@@ -1,6 +1,7 @@
 use std::io::Cursor;
 use byteorder::{BigEndian, ReadBytesExt};
 
+#[derive(Debug, PartialEq)]
 pub enum Error {
     MagicError,
 }
@@ -21,11 +22,13 @@ impl Header {
     }
 
     pub fn check(&self) -> Result<(), Error> {
-        //Err(Error::MagicError)
+        if self.magic != 0x78617221 {
+            return Err(Error::MagicError);
+        }
+
         Ok(())
     }
 }
-
 
 pub trait ReadHeader {
     fn read_header(&mut self) -> Result<Header, std::io::Error>;
