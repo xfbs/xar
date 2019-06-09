@@ -1,5 +1,11 @@
 #[cfg(test)]
 mod tests;
 
+mod error {
+    use error_chain::error_chain;
+    error_chain! {}
+}
+
 mod header;
-pub use header::Header;
+mod archive;
+pub use header::{Header};
