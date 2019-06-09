@@ -1,48 +1,66 @@
 use byteorder::{BigEndian, ReadBytesExt};
-use std::io::Cursor;
+
+/// Minimal size of header.
+const HEADER_SIZE: usize = 28;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
     MagicError,
-    VersionError,
+    Version(u16),
+    HeaderTooSmall(u16),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone)]
+pub enum ChecksumAlg {
+    None,
+    SHA1,
+    MD5,
+    SHA256,
+    SHA512,
+    Other(String),
+    Unknown(u32),
+}
+
+impl From<u32> for ChecksumAlg {
+    fn from(i: u32) -> ChecksumAlg {
+        match i {
+            0 => ChecksumAlg::None,
+            1 => ChecksumAlg::SHA1,
+            2 => ChecksumAlg::MD5,
+            3 => ChecksumAlg::SHA256,
+            4 => ChecksumAlg::SHA512,
+            3 => ChecksumAlg::Other(String::from("")),
+            i => ChecksumAlg::Unknown(i),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Header {
-    magic: u32,
-    size: u16,
-    version: u16,
-    toc_length_compressed: u64,
-    toc_length_uncompressed: u64,
-    checksum_alg: u32,
+    pub magic: u32,
+    pub size: u16,
+    pub version: u16,
+    pub toc_length_compressed: u64,
+    pub toc_length_uncompressed: u64,
+    pub checksum_alg: ChecksumAlg,
+    pub data: Vec<u8>,
 }
 
 impl Header {
-    pub fn new(
-        magic: u32,
-        size: u16,
-        version: u16,
-        toc_length_compressed: u64,
-        toc_length_uncompressed: u64,
-        checksum_alg: u32,
-    ) -> Header {
-        Header {
-            magic,
-            size,
-            version,
-            toc_length_compressed,
-            toc_length_uncompressed,
-            checksum_alg,
-        }
-    }
-
     pub fn check(&self) -> Result<(), Error> {
+        // needs to start with magic sequence 'xar!'.
         if self.magic != 0x78617221 {
             return Err(Error::MagicError);
         }
 
+        // header size has to be legal.
+        if self.size < 28 {
+            return Err(Error::HeaderTooSmall(self.size));
+        }
+
+        // we only accept version 1.
         if self.version != 1 {
-            return Err(Error::VersionError);
+            return Err(Error::Version(self.version));
         }
 
         Ok(())
@@ -50,6 +68,7 @@ impl Header {
 }
 
 pub trait ReadHeader {
+    /// Read a header.
     fn read_header(&mut self) -> Result<Header, std::io::Error>;
 }
 
@@ -65,6 +84,14 @@ where
         let toc_length_uncompressed = self.read_u64::<BigEndian>()?;
         let checksum_alg = self.read_u32::<BigEndian>()?;
 
+        // Read extra data until we've read in the whole header.
+        let data_size = (size as usize).saturating_sub(HEADER_SIZE);
+        let mut data = Vec::with_capacity(data_size);
+        data.resize(data_size, 0);
+        self.read_exact(&mut data)?;
+
+        let checksum_alg = checksum_alg.into();
+
         Ok(Header {
             magic,
             size,
@@ -72,6 +99,7 @@ where
             toc_length_compressed,
             toc_length_uncompressed,
             checksum_alg,
+            data,
         })
     }
 }
