@@ -4,10 +4,14 @@ use std::io::Cursor;
 
 const NULL_XAR: &'static [u8] =
     include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/null.xar"));
-const NULL_TOC_SHA256_XAR: &'static [u8] =
-    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/null_toc_sha256.xar"));
-const NULL_TOC_SHA512_XAR: &'static [u8] =
-    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/null_toc_sha512.xar"));
+const NULL_TOC_SHA256_XAR: &'static [u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/data/null_toc_sha256.xar"
+));
+const NULL_TOC_SHA512_XAR: &'static [u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/data/null_toc_sha512.xar"
+));
 
 #[test]
 fn test_can_load_header() {
