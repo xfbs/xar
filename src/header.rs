@@ -1,5 +1,6 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use serde::{Serialize, Deserialize};
+use std::fmt;
 
 /// Minimal size of header.
 const HEADER_SIZE: usize = 28;
@@ -69,6 +70,17 @@ impl Header {
 
     pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
+    }
+}
+
+impl fmt::Display for Header {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:25}: {}\n", "magic", self.magic)?;
+        write!(f, "{:25}: {}\n", "size (header)", self.size)?;
+        write!(f, "{:25}: {}\n", "toc length (compressed)", self.toc_length_compressed)?;
+        write!(f, "{:25}: {}\n", "toc length", self.toc_length_uncompressed)?;
+        write!(f, "{:25}: {:?}\n", "checksum_alg", self.checksum_alg)?;
+        write!(f, "{:25}: {:?}", "extra data", self.data)
     }
 }
 

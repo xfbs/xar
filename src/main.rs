@@ -72,7 +72,7 @@ fn inspect(matches: &ArgMatches) -> Result<()> {
     if matches.is_present("json") {
         println!("{}", header.to_json().chain_err(|| "Can't convert to JSON.")?);
     } else {
-        println!("{:?}", &header);
+        println!("{}", &header);
     }
 
     Ok(())
