@@ -6,7 +6,7 @@ use std::fs::File;
 
 error_chain! {
     foreign_links {
-        IO(std::io::Error);
+        //IO(std::io::Error);
     }
 }
 
@@ -29,7 +29,12 @@ fn main() {
                         .help("Sets the input file to use")
                         .required(true)
                         .index(1),
-                ),
+                )
+                .arg(
+                    Arg::with_name("json")
+                        .long("json")
+                        .help("Export header as JSON."),
+                )
         )
         .subcommand(
             SubCommand::with_name("list")
@@ -62,8 +67,13 @@ fn inspect(matches: &ArgMatches) -> Result<()> {
     let filename = matches.value_of("FILE").chain_err(|| "No file specified.")?;
     let mut file = File::open(filename).chain_err(|| "Unable to open the archive.")?;
 
-    let header = file.read_header();
-    println!("{:?}", &header);
+    let header = file.read_header().chain_err(|| "Can't parse header.")?;
+
+    if matches.is_present("json") {
+        println!("{}", header.to_json().chain_err(|| "Can't convert to JSON.")?);
+    } else {
+        println!("{:?}", &header);
+    }
 
     Ok(())
 }

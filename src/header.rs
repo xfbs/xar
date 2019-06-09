@@ -67,11 +67,9 @@ impl Header {
         Ok(())
     }
 
-    /*
     pub fn to_json(&self) -> Result<String, serde_json::Error> {
-        serde::to_string(self)
+        serde_json::to_string(self)
     }
-    */
 }
 
 pub trait ReadHeader {
