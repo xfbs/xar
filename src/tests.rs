@@ -1,5 +1,5 @@
 use crate::header;
-use crate::{ReadHeader};
+use crate::Header;
 use std::io::Cursor;
 
 const NULL_XAR: &'static [u8] =
@@ -16,7 +16,7 @@ const NULL_TOC_SHA512_XAR: &'static [u8] = include_bytes!(concat!(
 #[test]
 fn test_can_load_header() {
     let mut cursor = Cursor::new(NULL_XAR);
-    let header = cursor.read_header().unwrap();
+    let header = Header::from_read(&mut cursor).unwrap();
     assert!(header.check().is_ok());
     assert_eq!(header.size, 28);
     assert_eq!(header.version, 1);
@@ -28,7 +28,7 @@ fn test_can_load_header() {
 #[test]
 fn test_can_load_header_toc_cksum_sha256() {
     let mut cursor = Cursor::new(NULL_TOC_SHA256_XAR);
-    let header = cursor.read_header().unwrap();
+    let header = Header::from_read(&mut cursor).unwrap();
     assert!(header.check().is_ok());
     assert_eq!(header.size, 28);
     assert_eq!(header.version, 1);
@@ -43,7 +43,7 @@ fn test_header_load_fails_with_invalid_magic() {
         let mut copy: Vec<u8> = NULL_XAR.into();
         copy[i] = copy[i] + 1;
         let mut cursor = Cursor::new(&copy);
-        let header = cursor.read_header().unwrap();
+        let header = Header::from_read(&mut cursor).unwrap();
         assert_eq!(header.check(), Err(header::Error::MagicError));
     }
 }
@@ -54,6 +54,6 @@ fn test_header_load_fails_with_invalid_version() {
     copy[6] = 0;
     copy[7] = 0;
     let mut cursor = Cursor::new(&copy);
-    let header = cursor.read_header().unwrap();
+    let header = Header::from_read(&mut cursor).unwrap();
     assert_eq!(header.check(), Err(header::Error::Version(0)));
 }

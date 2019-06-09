@@ -1,8 +1,8 @@
 extern crate xar;
-use clap::{App, Arg, SubCommand, ArgMatches};
-use xar::{ReadHeader};
+use clap::{App, Arg, ArgMatches, SubCommand};
 use error_chain::{error_chain, ChainedError};
 use std::fs::File;
+use xar::Header;
 
 error_chain! {
     foreign_links {
@@ -34,7 +34,7 @@ fn main() {
                     Arg::with_name("json")
                         .long("json")
                         .help("Export header as JSON."),
-                )
+                ),
         )
         .subcommand(
             SubCommand::with_name("list")
@@ -49,7 +49,7 @@ fn main() {
         .get_matches();
 
     match run(&matches) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => println!("{}", e.display_chain()),
     }
 }
@@ -64,13 +64,18 @@ fn run(matches: &ArgMatches) -> Result<()> {
 }
 
 fn inspect(matches: &ArgMatches) -> Result<()> {
-    let filename = matches.value_of("FILE").chain_err(|| "No file specified.")?;
+    let filename = matches
+        .value_of("FILE")
+        .chain_err(|| "No file specified.")?;
     let mut file = File::open(filename).chain_err(|| "Unable to open the archive.")?;
 
-    let header = file.read_header().chain_err(|| "Can't parse header.")?;
+    let header = Header::from_read(&mut file).chain_err(|| "Can't parse header.")?;
 
     if matches.is_present("json") {
-        println!("{}", header.to_json().chain_err(|| "Can't convert to JSON.")?);
+        println!(
+            "{}",
+            header.to_json().chain_err(|| "Can't convert to JSON.")?
+        );
     } else {
         println!("{}", &header);
     }

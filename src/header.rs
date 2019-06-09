@@ -1,6 +1,7 @@
 use byteorder::{BigEndian, ReadBytesExt};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::io::Read;
 
 /// Minimal size of header.
 const HEADER_SIZE: usize = 28;
@@ -31,7 +32,6 @@ impl From<u32> for ChecksumAlg {
             2 => ChecksumAlg::MD5,
             3 => ChecksumAlg::SHA256,
             4 => ChecksumAlg::SHA512,
-            5 => ChecksumAlg::Other(String::from("")),
             i => ChecksumAlg::Unknown(i),
         }
     }
@@ -71,41 +71,20 @@ impl Header {
     pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
     }
-}
 
-impl fmt::Display for Header {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:25}: {}\n", "magic", self.magic)?;
-        write!(f, "{:25}: {}\n", "size (header)", self.size)?;
-        write!(f, "{:25}: {}\n", "toc length (compressed)", self.toc_length_compressed)?;
-        write!(f, "{:25}: {}\n", "toc length", self.toc_length_uncompressed)?;
-        write!(f, "{:25}: {:?}\n", "checksum_alg", self.checksum_alg)?;
-        write!(f, "{:25}: {:?}", "extra data", self.data)
-    }
-}
-
-pub trait ReadHeader {
-    /// Read a header.
-    fn read_header(&mut self) -> Result<Header, std::io::Error>;
-}
-
-impl<T> ReadHeader for T
-where
-    T: ReadBytesExt,
-{
-    fn read_header(&mut self) -> Result<Header, std::io::Error> {
-        let magic = self.read_u32::<BigEndian>()?;
-        let size = self.read_u16::<BigEndian>()?;
-        let version = self.read_u16::<BigEndian>()?;
-        let toc_length_compressed = self.read_u64::<BigEndian>()?;
-        let toc_length_uncompressed = self.read_u64::<BigEndian>()?;
-        let checksum_alg = self.read_u32::<BigEndian>()?;
+    pub fn from_read<T: Read>(reader: &mut T) -> Result<Header, std::io::Error> {
+        let magic = reader.read_u32::<BigEndian>()?;
+        let size = reader.read_u16::<BigEndian>()?;
+        let version = reader.read_u16::<BigEndian>()?;
+        let toc_length_compressed = reader.read_u64::<BigEndian>()?;
+        let toc_length_uncompressed = reader.read_u64::<BigEndian>()?;
+        let checksum_alg = reader.read_u32::<BigEndian>()?;
 
         // Read extra data until we've read in the whole header.
         let data_size = (size as usize).saturating_sub(HEADER_SIZE);
         let mut data = Vec::with_capacity(data_size);
         data.resize(data_size, 0);
-        self.read_exact(&mut data)?;
+        reader.read_exact(&mut data)?;
 
         let checksum_alg = checksum_alg.into();
 
@@ -118,5 +97,20 @@ where
             checksum_alg,
             data,
         })
+    }
+}
+
+impl fmt::Display for Header {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:25}: {}\n", "magic", self.magic)?;
+        write!(f, "{:25}: {}\n", "size (header)", self.size)?;
+        write!(
+            f,
+            "{:25}: {}\n",
+            "toc length (compressed)", self.toc_length_compressed
+        )?;
+        write!(f, "{:25}: {}\n", "toc length", self.toc_length_uncompressed)?;
+        write!(f, "{:25}: {:?}\n", "checksum_alg", self.checksum_alg)?;
+        write!(f, "{:25}: {:?}", "extra data", self.data)
     }
 }
