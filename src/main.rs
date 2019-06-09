@@ -2,7 +2,7 @@ extern crate xar;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use error_chain::{error_chain, ChainedError};
 use std::fs::File;
-use xar::Header;
+use xar::Archive;
 
 error_chain! {
     foreign_links {
@@ -69,15 +69,16 @@ fn inspect(matches: &ArgMatches) -> Result<()> {
         .chain_err(|| "No file specified.")?;
     let mut file = File::open(filename).chain_err(|| "Unable to open the archive.")?;
 
-    let header = Header::from_read(&mut file).chain_err(|| "Can't parse header.")?;
+    //let header = Header::from_read(&mut file).chain_err(|| "Can't parse header.")?;
+    let archive = Archive::from_read(&mut file).chain_err(|| "Can't inspect archive.")?;
 
     if matches.is_present("json") {
-        println!(
+        /*println!(
             "{}",
             header.to_json().chain_err(|| "Can't convert to JSON.")?
-        );
+        );*/
     } else {
-        println!("{}", &header);
+        println!("{}", &archive);
     }
 
     Ok(())
