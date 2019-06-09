@@ -1,9 +1,8 @@
 extern crate xar;
 use clap::{App, Arg, SubCommand, ArgMatches};
-use xar::{Header, ReadHeader};
+use xar::{ReadHeader};
 use error_chain::{error_chain, ChainedError};
 use std::fs::File;
-use std::io::prelude::*;
 
 error_chain! {
     foreign_links {
@@ -69,10 +68,10 @@ fn inspect(matches: &ArgMatches) -> Result<()> {
     Ok(())
 }
 
-fn list(matches: &ArgMatches) -> Result<()> {
+fn list(_matches: &ArgMatches) -> Result<()> {
     Ok(())
 }
 
-fn default(matches: &ArgMatches) -> Result<()> {
+fn default(_matches: &ArgMatches) -> Result<()> {
     Ok(())
 }

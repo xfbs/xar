@@ -1,4 +1,5 @@
 use byteorder::{BigEndian, ReadBytesExt};
+use serde::{Serialize, Deserialize};
 
 /// Minimal size of header.
 const HEADER_SIZE: usize = 28;
@@ -10,7 +11,7 @@ pub enum Error {
     HeaderTooSmall(u16),
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ChecksumAlg {
     None,
     SHA1,
@@ -29,13 +30,13 @@ impl From<u32> for ChecksumAlg {
             2 => ChecksumAlg::MD5,
             3 => ChecksumAlg::SHA256,
             4 => ChecksumAlg::SHA512,
-            3 => ChecksumAlg::Other(String::from("")),
+            5 => ChecksumAlg::Other(String::from("")),
             i => ChecksumAlg::Unknown(i),
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Header {
     pub magic: u32,
     pub size: u16,
@@ -65,6 +66,12 @@ impl Header {
 
         Ok(())
     }
+
+    /*
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde::to_string(self)
+    }
+    */
 }
 
 pub trait ReadHeader {

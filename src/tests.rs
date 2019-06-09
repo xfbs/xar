@@ -1,5 +1,5 @@
 use crate::header;
-use crate::{Header, ReadHeader};
+use crate::{ReadHeader};
 use std::io::Cursor;
 
 const NULL_XAR: &'static [u8] =
