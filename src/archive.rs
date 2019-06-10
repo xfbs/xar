@@ -20,6 +20,14 @@ impl Archive {
             toc
         })
     }
+
+    pub fn header(&self) -> &Header {
+        &self.header
+    }
+
+    pub fn toc(&self) -> &Toc {
+        &self.toc
+    }
 }
 
 impl std::fmt::Display for Archive {
