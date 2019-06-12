@@ -3,7 +3,8 @@ mod tests;
 
 mod error {
     use error_chain::error_chain;
-    error_chain! {}
+    error_chain! {
+    }
 }
 
 mod header;
