@@ -74,7 +74,10 @@ fn inspect(matches: &ArgMatches) -> Result<()> {
     if matches.is_present("json") {
         println!(
             "{}",
-            archive.header().to_json().chain_err(|| "Can't convert to JSON.")?
+            archive
+                .header()
+                .to_json()
+                .chain_err(|| "Can't convert to JSON.")?
         );
     } else {
         println!("{}", &archive);

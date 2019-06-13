@@ -1,10 +1,10 @@
 use crate::error::*;
-use std::io::Read;
 use libflate::zlib::Decoder;
-use std::fmt;
-use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::Reader;
+use std::fmt;
 use std::io::Cursor;
+use std::io::Read;
 
 #[derive(Debug, Clone)]
 pub struct Toc {
@@ -23,8 +23,11 @@ impl Toc {
     pub fn from_read<T: Read>(reader: &mut T, expected: usize) -> Result<Toc> {
         // decompress table of contents
         let mut data = Vec::with_capacity(expected);
-        let mut decoder = Decoder::new(reader).chain_err(|| "Error decompressing table of contents")?;
-        decoder.read_to_end(&mut data).chain_err(|| "Error decompressing table of contents")?;
+        let mut decoder =
+            Decoder::new(reader).chain_err(|| "Error decompressing table of contents")?;
+        decoder
+            .read_to_end(&mut data)
+            .chain_err(|| "Error decompressing table of contents")?;
         let data = String::from_utf8(data).chain_err(|| "Error decompressing table of contents")?;
 
         let mut reader = Reader::from_str(&data);
@@ -39,16 +42,13 @@ impl Toc {
             };
 
             match event {
-                Event::Start(ref e) => {
-                    match e.name() {
-                        b"creation-time" => toc.read_creation_time(&mut reader),
-                        _ => {}
-                    }
+                Event::Start(ref e) => match e.name() {
+                    b"creation-time" => toc.read_creation_time(&mut reader),
+                    _ => {}
                 },
-                Event::Text(ref e) => {
-                },
+                Event::Text(ref e) => {}
                 Event::Eof => break,
-                _ => {},
+                _ => {}
             }
 
             buf.clear();
@@ -61,19 +61,30 @@ impl Toc {
 
     fn read_creation_time<B: std::io::BufRead>(&mut self, reader: &mut Reader<B>) {
         let mut buf = Vec::new();
+        let mut depth = 1;
 
-        match reader.read_event(&mut buf) {
-            Ok(Event::Text(ref e)) => {
-                self.creation_time = Some(String::from_utf8_lossy(e.escaped()).to_string());
-            },
-            _ => {},
+        while depth > 0 {
+            match reader.read_event(&mut buf) {
+                Ok(Event::Text(ref e)) => {
+                    self.creation_time = Some(String::from_utf8_lossy(e.escaped()).to_string());
+                },
+                Ok(Event::Start(_)) => depth += 1,
+                Ok(Event::End(_)) => depth -= 1,
+                Err(_) => break,
+                _ => {}
+            }
         }
     }
 }
 
 impl std::fmt::Display for Toc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:25}: {}\n", "creation_time", self.creation_time.as_ref().unwrap_or(&"None".to_string()));
+        write!(
+            f,
+            "{:25}: {}\n",
+            "creation_time",
+            self.creation_time.as_ref().unwrap_or(&"None".to_string())
+        );
         write!(f, "{}", self.data)
     }
 }
