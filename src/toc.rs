@@ -1,6 +1,6 @@
 use crate::error::*;
 use libflate::zlib::Decoder;
-use quick_xml::events::{BytesText, Event};
+use quick_xml::events::{BytesText, BytesStart, Event};
 use quick_xml::Reader;
 use std::fmt;
 use std::io::Read;
@@ -53,10 +53,25 @@ impl Toc {
             };
 
             match event {
-                Event::Start(ref e) => match e.name() {
-                    b"creation-time" => self.read_creation_time(reader),
-                    b"checksum" => self.read_checksum(reader),
-                    _ => {}
+                Event::Start(ref e) if e.name() == b"toc" => {
+                    Self::handle(
+                        reader,
+                        |reader, text| {},
+                        |reader, start| match start.name() {
+                            b"creation-time" => {
+                                println!("got creation time");
+                                Self::ignore(reader);
+                            },
+                            b"checksum" => {
+                                println!("got checksum!");
+                                Self::ignore(reader);
+                            },
+                            b"file" => {
+                                println!("got file");
+                                Self::ignore(reader);
+                            },
+                            _ => {},
+                        });
                 },
                 Event::Eof => break,
                 _ => {}
@@ -66,57 +81,34 @@ impl Toc {
         }
     }
 
-    fn read_creation_time<B: std::io::BufRead>(&mut self, reader: &mut Reader<B>) {
-        let text: Vec<String> =
-            self.read_text(reader, |data| String::from_utf8_lossy(data).to_string());
-        let text = text.join(" ");
-        self.creation_time = Some(text);
-    }
-
-    fn read_checksum<B: std::io::BufRead>(&mut self, reader: &mut Reader<B>) {
+    fn handle<B: std::io::BufRead, T: FnMut(&mut Reader<B>, &BytesText), S: FnMut(&mut Reader<B>, &BytesStart)>(reader: &mut Reader<B>, mut text: T, mut start: S) {
         let mut buf = Vec::new();
-        let mut depth = 1;
 
-        while depth > 0 {
+        loop {
             match reader.read_event(&mut buf) {
-                Ok(Event::Start(ref e)) if e.name() == b"offset" => {
-                    self.offset = Some(self.read_text(reader, |data| String::from_utf8_lossy(data).to_string()).join(" "));
-                },
-                Ok(Event::Start(ref e)) if e.name() == b"size" => {
-                    self.size = Some(self.read_text(reader, |data| String::from_utf8_lossy(data).to_string()).join(" "));
-                },
-                Ok(Event::Start(_)) => depth += 1,
-                Ok(Event::End(_)) => depth -= 1,
+                Ok(Event::Text(ref e)) => text(reader, e),
+                Ok(Event::Start(ref e)) => start(reader, e),
                 Err(_) => break,
                 Ok(Event::Eof) => break,
+                Ok(Event::End(_)) => break,
                 _ => {},
             }
         }
     }
 
-    fn read_text<T, F: Fn(&[u8]) -> T, B: std::io::BufRead>(
-        &mut self,
-        reader: &mut Reader<B>,
-        handler: F,
-    ) -> Vec<T> {
+    fn ignore<B: std::io::BufRead>(reader: &mut Reader<B>) {
         let mut buf = Vec::new();
         let mut depth = 1;
 
-        let mut text_events: Vec<T> = Vec::new();
-
-        while depth > 0 {
+        while 0 < depth {
             match reader.read_event(&mut buf) {
-                Ok(Event::Text(ref e)) if depth == 1 => {
-                    text_events.push(handler(e.escaped()));
-                }
-                Ok(Event::Start(_)) => depth += 1,
                 Ok(Event::End(_)) => depth -= 1,
+                Ok(Event::Start(_)) => depth += 1,
                 Err(_) => break,
-                _ => {}
+                Ok(Event::Eof) => break,
+                _ => {},
             }
         }
-
-        text_events
     }
 }
 
