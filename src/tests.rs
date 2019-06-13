@@ -4,10 +4,12 @@ use std::io::Cursor;
 
 const NULL_XAR: &'static [u8] =
     include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/null.xar"));
+
 const NULL_TOC_SHA256_XAR: &'static [u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/data/null_toc_sha256.xar"
 ));
+
 const NULL_TOC_SHA512_XAR: &'static [u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/data/null_toc_sha512.xar"
@@ -35,6 +37,18 @@ fn test_can_load_header_toc_cksum_sha256() {
     assert_eq!(header.toc_length_compressed, 256 + 101);
     assert_eq!(header.toc_length_uncompressed, 512 + 200);
     assert_eq!(header.checksum_alg, header::ChecksumAlg::SHA256);
+}
+
+#[test]
+fn test_can_load_header_toc_cksum_sha512() {
+    let mut cursor = Cursor::new(NULL_TOC_SHA512_XAR);
+    let header = Header::from_read(&mut cursor).unwrap();
+    assert!(header.check().is_ok());
+    assert_eq!(header.size, 28);
+    assert_eq!(header.version, 1);
+    assert_eq!(header.toc_length_compressed, 357);
+    assert_eq!(header.toc_length_uncompressed, 712);
+    assert_eq!(header.checksum_alg, header::ChecksumAlg::SHA512);
 }
 
 #[test]
