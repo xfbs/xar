@@ -1,6 +1,6 @@
 use crate::error::*;
 use libflate::zlib::Decoder;
-use quick_xml::events::{BytesText, BytesStart, Event};
+use quick_xml::events::{BytesStart, BytesText, Event};
 use quick_xml::Reader;
 use std::fmt;
 use std::io::Read;
@@ -47,13 +47,9 @@ impl Toc {
         let mut buf = Vec::new();
 
         loop {
-            let event = match reader.read_event(&mut buf) {
-                Ok(e) => e,
+            match reader.read_event(&mut buf) {
                 Err(_) => break,
-            };
-
-            match event {
-                Event::Start(ref e) if e.name() == b"toc" => {
+                Ok(Event::Start(ref e)) if e.name() == b"toc" => {
                     Self::handle(
                         reader,
                         |reader, text| {},
@@ -61,19 +57,20 @@ impl Toc {
                             b"creation-time" => {
                                 println!("got creation time");
                                 Self::ignore(reader);
-                            },
+                            }
                             b"checksum" => {
                                 println!("got checksum!");
                                 Self::ignore(reader);
-                            },
+                            }
                             b"file" => {
                                 println!("got file");
                                 Self::ignore(reader);
-                            },
-                            _ => {},
-                        });
-                },
-                Event::Eof => break,
+                            }
+                            _ => {}
+                        },
+                    );
+                }
+                Ok(Event::Eof) => break,
                 _ => {}
             }
 
@@ -81,7 +78,15 @@ impl Toc {
         }
     }
 
-    fn handle<B: std::io::BufRead, T: FnMut(&mut Reader<B>, &BytesText), S: FnMut(&mut Reader<B>, &BytesStart)>(reader: &mut Reader<B>, mut text: T, mut start: S) {
+    fn handle<
+        B: std::io::BufRead,
+        T: FnMut(&mut Reader<B>, &BytesText),
+        S: FnMut(&mut Reader<B>, &BytesStart),
+    >(
+        reader: &mut Reader<B>,
+        mut text: T,
+        mut start: S,
+    ) {
         let mut buf = Vec::new();
 
         loop {
@@ -91,7 +96,7 @@ impl Toc {
                 Err(_) => break,
                 Ok(Event::Eof) => break,
                 Ok(Event::End(_)) => break,
-                _ => {},
+                _ => {}
             }
         }
     }
@@ -106,7 +111,7 @@ impl Toc {
                 Ok(Event::Start(_)) => depth += 1,
                 Err(_) => break,
                 Ok(Event::Eof) => break,
-                _ => {},
+                _ => {}
             }
         }
     }
