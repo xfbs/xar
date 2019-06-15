@@ -10,8 +10,8 @@ pub struct Toc {
     data: String,
     creation_time: Option<String>,
     checksum_type: Option<String>,
-    offset: Option<String>,
-    size: Option<String>,
+    checksum_offset: Option<String>,
+    checksum_size: Option<String>,
     files: Vec<File>,
 }
 
@@ -64,8 +64,8 @@ impl Toc {
             data: String::new(),
             creation_time: None,
             checksum_type: None,
-            offset: None,
-            size: None,
+            checksum_offset: None,
+            checksum_size: None,
             files: Vec::new(),
         }
     }
@@ -137,7 +137,18 @@ impl Toc {
         );
     }
 
-    fn parse_checksum<B: BufRead>(&mut self, reader: &mut Reader<B>, _tag: &BytesStart) {
+    fn parse_checksum<B: BufRead>(&mut self, reader: &mut Reader<B>, tag: &BytesStart) {
+        for attr in tag.attributes() {
+            if let Ok(attr) = attr {
+                match attr.key {
+                    b"style" => {
+                        self.checksum_type = Some(String::from_utf8_lossy(&attr.value).to_string());
+                    },
+                    _ => {},
+                }
+            }
+        }
+
         Self::handle(
             reader,
             |_, _| {},
@@ -151,7 +162,7 @@ impl Toc {
     fn parse_checksum_offset<B: BufRead>(&mut self, reader: &mut Reader<B>, _tag: &BytesStart) {
         Self::handle(
             reader,
-            |_, text| self.offset = Some(String::from_utf8_lossy(text.escaped()).to_string()),
+            |_, text| self.checksum_offset = Some(String::from_utf8_lossy(text.escaped()).to_string()),
             |reader, _| Self::ignore(reader),
             );
     }
@@ -159,7 +170,7 @@ impl Toc {
     fn parse_checksum_size<B: BufRead>(&mut self, reader: &mut Reader<B>, _tag: &BytesStart) {
         Self::handle(
             reader,
-            |_, text| self.size = Some(String::from_utf8_lossy(text.escaped()).to_string()),
+            |_, text| self.checksum_size = Some(String::from_utf8_lossy(text.escaped()).to_string()),
             |reader, _| Self::ignore(reader),
             );
     }
@@ -270,14 +281,20 @@ impl std::fmt::Display for Toc {
         write!(
             f,
             "{:25}: {}\n",
-            "offset",
-            self.offset.as_ref().unwrap_or(&"None".to_string())
+            "checksum_type",
+            self.checksum_type.as_ref().unwrap_or(&"None".to_string())
         )?;
         write!(
             f,
             "{:25}: {}\n",
-            "size",
-            self.size.as_ref().unwrap_or(&"None".to_string())
+            "checksum_offset",
+            self.checksum_offset.as_ref().unwrap_or(&"None".to_string())
+        )?;
+        write!(
+            f,
+            "{:25}: {}\n",
+            "checksum_size",
+            self.checksum_size.as_ref().unwrap_or(&"None".to_string())
         )?;
 
         for file in &self.files {
