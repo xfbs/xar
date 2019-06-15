@@ -29,7 +29,7 @@ pub struct File {
     uid: Option<String>,
     mode: Option<String>,
     inode: Option<String>,
-    children: Vec<File>
+    children: Vec<File>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -143,8 +143,8 @@ impl Toc {
                 match attr.key {
                     b"style" => {
                         self.checksum_type = Some(String::from_utf8_lossy(&attr.value).to_string());
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
             }
         }
@@ -156,23 +156,28 @@ impl Toc {
                 b"offset" => self.parse_checksum_offset(reader, tag),
                 b"size" => self.parse_checksum_size(reader, tag),
                 _ => Self::ignore(reader),
-            });
+            },
+        );
     }
 
     fn parse_checksum_offset<B: BufRead>(&mut self, reader: &mut Reader<B>, _tag: &BytesStart) {
         Self::handle(
             reader,
-            |_, text| self.checksum_offset = Some(String::from_utf8_lossy(text.escaped()).to_string()),
+            |_, text| {
+                self.checksum_offset = Some(String::from_utf8_lossy(text.escaped()).to_string())
+            },
             |reader, _| Self::ignore(reader),
-            );
+        );
     }
 
     fn parse_checksum_size<B: BufRead>(&mut self, reader: &mut Reader<B>, _tag: &BytesStart) {
         Self::handle(
             reader,
-            |_, text| self.checksum_size = Some(String::from_utf8_lossy(text.escaped()).to_string()),
+            |_, text| {
+                self.checksum_size = Some(String::from_utf8_lossy(text.escaped()).to_string())
+            },
             |reader, _| Self::ignore(reader),
-            );
+        );
     }
 
     fn parse_file<B: BufRead>(&mut self, reader: &mut Reader<B>, tag: &BytesStart) -> File {
@@ -182,7 +187,7 @@ impl Toc {
             if let Ok(attr) = attr {
                 match attr.key {
                     b"id" => file.id = Some(String::from_utf8_lossy(&attr.value).to_string()),
-                    _ => {},
+                    _ => {}
                 }
             }
         }
@@ -198,24 +203,33 @@ impl Toc {
                     file.children.push(f);
                 }
                 _ => Self::ignore(reader),
-            });
+            },
+        );
 
         file
     }
 
-    fn parse_file_name<B: BufRead>(&mut self, reader: &mut Reader<B>, _tag: &BytesStart) -> Option<String> {
+    fn parse_file_name<B: BufRead>(
+        &mut self,
+        reader: &mut Reader<B>,
+        _tag: &BytesStart,
+    ) -> Option<String> {
         let mut name = None;
 
         Self::handle(
             reader,
             |_, text| name = Some(String::from_utf8_lossy(text.escaped()).to_string()),
             |reader, _| Self::ignore(reader),
-            );
+        );
 
         name
     }
 
-    fn parse_file_type<B: BufRead>(&mut self, reader: &mut Reader<B>, _tag: &BytesStart) -> Option<FileType> {
+    fn parse_file_type<B: BufRead>(
+        &mut self,
+        reader: &mut Reader<B>,
+        _tag: &BytesStart,
+    ) -> Option<FileType> {
         let mut filetype = None;
 
         Self::handle(
@@ -223,10 +237,10 @@ impl Toc {
             |_, text| match text.escaped() {
                 b"directory" => filetype = Some(FileType::Directory),
                 b"character special" => filetype = Some(FileType::CharacterSpecial),
-                _ => {},
+                _ => {}
             },
             |reader, _| Self::ignore(reader),
-            );
+        );
 
         filetype
     }
