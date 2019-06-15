@@ -3,7 +3,7 @@ use libflate::zlib::Decoder;
 use quick_xml::events::{BytesStart, BytesText, Event};
 use quick_xml::Reader;
 use std::fmt;
-use std::io::{Read, BufRead};
+use std::io::{BufRead, Read};
 
 #[derive(Debug, Clone)]
 pub struct Toc {
@@ -69,14 +69,9 @@ impl Toc {
                     self.parse_creation_time(reader, start);
                 }
                 b"checksum" => {
-                    println!("got checksum!");
-                    Self::ignore(reader);
+                    self.parse_checksum(reader, start);
                 }
-                b"file" => {
-                    println!("got file");
-                    Self::ignore(reader);
-                }
-                _ => {}
+                _ => Self::ignore(reader),
             },
         );
     }
@@ -88,6 +83,33 @@ impl Toc {
                 self.creation_time = Some(String::from_utf8_lossy(text.escaped()).to_string());
             },
             |reader, tag| Self::ignore(reader),
+        );
+    }
+
+    fn parse_checksum<B: BufRead>(&mut self, reader: &mut Reader<B>, tag: &BytesStart) {
+        Self::handle(
+            reader,
+            |_, _| {},
+            |reader, tag| match tag.name() {
+                b"offset" => self.parse_checksum_offset(reader, tag),
+                b"size" => self.parse_checksum_size(reader, tag),
+                _ => Self::ignore(reader),
+            });
+    }
+
+    fn parse_checksum_offset<B: BufRead>(&mut self, reader: &mut Reader<B>, tag: &BytesStart) {
+        Self::handle(
+            reader,
+            |_, text| self.offset = Some(String::from_utf8_lossy(text.escaped()).to_string()),
+            |reader, _| Self::ignore(reader),
+            );
+    }
+
+    fn parse_checksum_size<B: BufRead>(&mut self, reader: &mut Reader<B>, tag: &BytesStart) {
+        Self::handle(
+            reader,
+            |_, text| self.size = Some(String::from_utf8_lossy(text.escaped()).to_string()),
+            |reader, _| Self::ignore(reader),
             );
     }
 
