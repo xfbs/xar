@@ -19,6 +19,15 @@ pub struct File {
     id: Option<String>,
     filetype: Option<FileType>,
     name: Option<String>,
+    ctime: Option<String>,
+    mtime: Option<String>,
+    atime: Option<String>,
+    group: Option<String>,
+    gid: Option<String>,
+    user: Option<String>,
+    uid: Option<String>,
+    mode: Option<String>,
+    inode: Option<String>,
     children: Vec<File>
 }
 
@@ -34,6 +43,15 @@ impl File {
             id: None,
             filetype: None,
             name: None,
+            ctime: None,
+            mtime: None,
+            atime: None,
+            group: None,
+            gid: None,
+            user: None,
+            uid: None,
+            mode: None,
+            inode: None,
             children: Vec::new(),
         }
     }
