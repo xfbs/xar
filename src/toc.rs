@@ -3,7 +3,7 @@ use libflate::zlib::Decoder;
 use quick_xml::events::{BytesStart, BytesText, Event};
 use quick_xml::Reader;
 use std::fmt;
-use std::io::Read;
+use std::io::{Read, BufRead};
 
 #[derive(Debug, Clone)]
 pub struct Toc {
@@ -50,25 +50,7 @@ impl Toc {
             match reader.read_event(&mut buf) {
                 Err(_) => break,
                 Ok(Event::Start(ref e)) if e.name() == b"toc" => {
-                    Self::handle(
-                        reader,
-                        |reader, text| {},
-                        |reader, start| match start.name() {
-                            b"creation-time" => {
-                                println!("got creation time");
-                                Self::ignore(reader);
-                            }
-                            b"checksum" => {
-                                println!("got checksum!");
-                                Self::ignore(reader);
-                            }
-                            b"file" => {
-                                println!("got file");
-                                Self::ignore(reader);
-                            }
-                            _ => {}
-                        },
-                    );
+                    self.parse_toc(reader, e);
                 }
                 Ok(Event::Eof) => break,
                 _ => {}
@@ -76,6 +58,37 @@ impl Toc {
 
             buf.clear();
         }
+    }
+
+    fn parse_toc<B: std::io::BufRead>(&mut self, reader: &mut Reader<B>, tag: &BytesStart) {
+        Self::handle(
+            reader,
+            |_, _| {},
+            |reader, start| match start.name() {
+                b"creation-time" => {
+                    self.parse_creation_time(reader, start);
+                }
+                b"checksum" => {
+                    println!("got checksum!");
+                    Self::ignore(reader);
+                }
+                b"file" => {
+                    println!("got file");
+                    Self::ignore(reader);
+                }
+                _ => {}
+            },
+        );
+    }
+
+    fn parse_creation_time<B: BufRead>(&mut self, reader: &mut Reader<B>, tag: &BytesStart) {
+        Self::handle(
+            reader,
+            |_, text| {
+                self.creation_time = Some(String::from_utf8_lossy(text.escaped()).to_string());
+            },
+            |reader, tag| Self::ignore(reader),
+            );
     }
 
     fn handle<
