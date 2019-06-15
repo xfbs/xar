@@ -11,6 +11,32 @@ pub struct Toc {
     creation_time: Option<String>,
     offset: Option<String>,
     size: Option<String>,
+    files: Vec<File>,
+}
+
+#[derive(Debug, Clone)]
+pub struct File {
+    id: Option<String>,
+    filetype: Option<FileType>,
+    name: Option<String>,
+    children: Vec<File>
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum FileType {
+    Directory,
+    CharacterSpecial,
+}
+
+impl File {
+    pub fn new() -> Self {
+        File {
+            id: None,
+            filetype: None,
+            name: None,
+            children: Vec::new(),
+        }
+    }
 }
 
 impl Toc {
@@ -20,6 +46,7 @@ impl Toc {
             creation_time: None,
             offset: None,
             size: None,
+            files: Vec::new(),
         }
     }
 
@@ -60,7 +87,7 @@ impl Toc {
         }
     }
 
-    fn parse_toc<B: std::io::BufRead>(&mut self, reader: &mut Reader<B>, tag: &BytesStart) {
+    fn parse_toc<B: std::io::BufRead>(&mut self, reader: &mut Reader<B>, _tag: &BytesStart) {
         Self::handle(
             reader,
             |_, _| {},
@@ -71,22 +98,26 @@ impl Toc {
                 b"checksum" => {
                     self.parse_checksum(reader, start);
                 }
+                b"file" => {
+                    let file = self.parse_file(reader, start);
+                    self.files.push(file);
+                }
                 _ => Self::ignore(reader),
             },
         );
     }
 
-    fn parse_creation_time<B: BufRead>(&mut self, reader: &mut Reader<B>, tag: &BytesStart) {
+    fn parse_creation_time<B: BufRead>(&mut self, reader: &mut Reader<B>, _tag: &BytesStart) {
         Self::handle(
             reader,
             |_, text| {
                 self.creation_time = Some(String::from_utf8_lossy(text.escaped()).to_string());
             },
-            |reader, tag| Self::ignore(reader),
+            |reader, _| Self::ignore(reader),
         );
     }
 
-    fn parse_checksum<B: BufRead>(&mut self, reader: &mut Reader<B>, tag: &BytesStart) {
+    fn parse_checksum<B: BufRead>(&mut self, reader: &mut Reader<B>, _tag: &BytesStart) {
         Self::handle(
             reader,
             |_, _| {},
@@ -97,7 +128,7 @@ impl Toc {
             });
     }
 
-    fn parse_checksum_offset<B: BufRead>(&mut self, reader: &mut Reader<B>, tag: &BytesStart) {
+    fn parse_checksum_offset<B: BufRead>(&mut self, reader: &mut Reader<B>, _tag: &BytesStart) {
         Self::handle(
             reader,
             |_, text| self.offset = Some(String::from_utf8_lossy(text.escaped()).to_string()),
@@ -105,12 +136,68 @@ impl Toc {
             );
     }
 
-    fn parse_checksum_size<B: BufRead>(&mut self, reader: &mut Reader<B>, tag: &BytesStart) {
+    fn parse_checksum_size<B: BufRead>(&mut self, reader: &mut Reader<B>, _tag: &BytesStart) {
         Self::handle(
             reader,
             |_, text| self.size = Some(String::from_utf8_lossy(text.escaped()).to_string()),
             |reader, _| Self::ignore(reader),
             );
+    }
+
+    fn parse_file<B: BufRead>(&mut self, reader: &mut Reader<B>, tag: &BytesStart) -> File {
+        let mut file = File::new();
+
+        for attr in tag.attributes() {
+            if let Ok(attr) = attr {
+                match attr.key {
+                    b"id" => file.id = Some(String::from_utf8_lossy(&attr.value).to_string()),
+                    _ => {},
+                }
+            }
+        }
+
+        Self::handle(
+            reader,
+            |_, _| {},
+            |reader, tag| match tag.name() {
+                b"name" => file.name = self.parse_file_name(reader, tag),
+                b"type" => file.filetype = self.parse_file_type(reader, tag),
+                b"file" => {
+                    let f = self.parse_file(reader, tag);
+                    file.children.push(f);
+                }
+                _ => Self::ignore(reader),
+            });
+
+        file
+    }
+
+    fn parse_file_name<B: BufRead>(&mut self, reader: &mut Reader<B>, _tag: &BytesStart) -> Option<String> {
+        let mut name = None;
+
+        Self::handle(
+            reader,
+            |_, text| name = Some(String::from_utf8_lossy(text.escaped()).to_string()),
+            |reader, _| Self::ignore(reader),
+            );
+
+        name
+    }
+
+    fn parse_file_type<B: BufRead>(&mut self, reader: &mut Reader<B>, _tag: &BytesStart) -> Option<FileType> {
+        let mut filetype = None;
+
+        Self::handle(
+            reader,
+            |_, text| match text.escaped() {
+                b"directory" => filetype = Some(FileType::Directory),
+                b"character special" => filetype = Some(FileType::CharacterSpecial),
+                _ => {},
+            },
+            |reader, _| Self::ignore(reader),
+            );
+
+        filetype
     }
 
     fn handle<
@@ -172,6 +259,11 @@ impl std::fmt::Display for Toc {
             "size",
             self.size.as_ref().unwrap_or(&"None".to_string())
         )?;
+
+        for file in &self.files {
+            write!(f, "{:?}\n", file)?;
+        }
+
         write!(f, "\n{}", self.data)
     }
 }
