@@ -9,6 +9,7 @@ use std::io::{BufRead, Read};
 pub struct Toc {
     data: String,
     creation_time: Option<String>,
+    checksum_type: Option<String>,
     offset: Option<String>,
     size: Option<String>,
     files: Vec<File>,
@@ -62,6 +63,7 @@ impl Toc {
         Toc {
             data: String::new(),
             creation_time: None,
+            checksum_type: None,
             offset: None,
             size: None,
             files: Vec::new(),
