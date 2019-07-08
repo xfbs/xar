@@ -1,14 +1,15 @@
 extern crate xar;
 use clap::{App, Arg, ArgMatches, SubCommand};
-use error_chain::{error_chain, ChainedError};
 use std::fs::File;
 use xar::Archive;
+use failure::{Fail, Error};
 
-error_chain! {
-    foreign_links {
-        //IO(std::io::Error);
-    }
+#[derive(Fail, Debug)]
+enum Errors {
+    #[fail(display = "Argument missing.")]
+    ArgMissing
 }
+
 
 fn main() {
     let matches = App::new("xar")
@@ -50,11 +51,11 @@ fn main() {
 
     match run(&matches) {
         Ok(_) => {}
-        Err(e) => println!("{}", e.display_chain()),
+        Err(e) => println!("{}", e),
     }
 }
 
-fn run(matches: &ArgMatches) -> Result<()> {
+fn run(matches: &ArgMatches) -> Result<(), Error> {
     match matches.subcommand() {
         ("inspect", Some(matches)) => inspect(matches),
         ("list", Some(matches)) => list(matches),
@@ -63,21 +64,20 @@ fn run(matches: &ArgMatches) -> Result<()> {
     }
 }
 
-fn inspect(matches: &ArgMatches) -> Result<()> {
+fn inspect(matches: &ArgMatches) -> Result<(), Error> {
     let filename = matches
         .value_of("FILE")
-        .chain_err(|| "No file specified.")?;
-    let mut file = File::open(filename).chain_err(|| "Unable to open the archive.")?;
+        .ok_or(Errors::ArgMissing)?;
+    let mut file = File::open(filename)?;
 
-    let archive = Archive::from_read(&mut file).chain_err(|| "Can't inspect archive.")?;
+    let archive = Archive::from_read(&mut file)?;
 
     if matches.is_present("json") {
         println!(
             "{}",
             archive
                 .header()
-                .to_json()
-                .chain_err(|| "Can't convert to JSON.")?
+                .to_json()?
         );
     } else {
         println!("{}", &archive);
@@ -86,10 +86,10 @@ fn inspect(matches: &ArgMatches) -> Result<()> {
     Ok(())
 }
 
-fn list(_matches: &ArgMatches) -> Result<()> {
+fn list(_matches: &ArgMatches) -> Result<(), Error> {
     Ok(())
 }
 
-fn default(_matches: &ArgMatches) -> Result<()> {
+fn default(_matches: &ArgMatches) -> Result<(), Error> {
     Ok(())
 }

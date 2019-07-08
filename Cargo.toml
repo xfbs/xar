@@ -22,3 +22,5 @@ serde = { version = "1.0.92", features = ["derive"] }
 serde_json = "1.0.39"
 quick-xml = "0.14.0"
 chrono = "0.4.6"
+xmltree = "0.8.0"
+failure = "0.1.5"

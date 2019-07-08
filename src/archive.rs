@@ -1,8 +1,8 @@
-use crate::error::*;
 use crate::header::Header;
 use crate::toc::Toc;
 use std::fmt;
 use std::io::{Read, Seek};
+use failure::Error;
 
 #[derive(Debug, Clone)]
 pub struct Archive {
@@ -11,12 +11,11 @@ pub struct Archive {
 }
 
 impl Archive {
-    pub fn from_read<T: Read + Seek>(reader: &mut T) -> Result<Archive> {
-        let header = Header::from_read(reader).chain_err(|| "Error reading header")?;
+    pub fn from_read<T: Read + Seek>(reader: &mut T) -> Result<Archive, Error> {
+        let header = Header::from_read(reader)?;
 
         // TODO: verify that only header.toc_length_compressed bytes were read.
-        let toc = Toc::from_read(reader, header.toc_length_uncompressed as usize)
-            .chain_err(|| "Error reading archive")?;
+        let toc = Toc::from_read(reader, header.toc_length_uncompressed as usize)?;
 
         Ok(Archive { header, toc })
     }
