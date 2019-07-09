@@ -19,12 +19,27 @@ pub enum Errors {
     ChecksumOffsetInvalid,
 }
 
+/// Table of contents.
 #[derive(Debug, Clone)]
 pub struct Toc {
     data: Element,
 }
 
+/// File object.
+#[derive(Debug, Clone)]
+pub struct File<'a> {
+    data: &'a Element
+}
+
+/// Iterator over the files (in the current level).
+#[derive(Debug, Clone)]
+pub struct Files<'a> {
+    data: &'a Element,
+    offset: usize,
+}
+
 impl Toc {
+    /// Contstruct a toc from a reader pointed at the start of it.
     pub fn from_read<T: Read>(reader: &mut T, expected: usize) -> Result<Toc, Error> {
         let mut decoder = Decoder::new(reader).unwrap();
         let element = Element::parse(&mut decoder)?;
@@ -36,10 +51,12 @@ impl Toc {
         &self.data
     }
 
+    /// Print the toc as XML to writer.
     pub fn write<W: Write>(&self, writer: W) -> Result<(), xmltree::Error> {
         self.data.write(writer)
     }
 
+    /// Compute creation time of Toc.
     pub fn creation_time(&self) -> Result<NaiveDateTime, Error> {
         let time = self.creation_time_element()?;
         let text = time.text.as_ref().ok_or(Errors::NoCreationTime)?;
@@ -53,6 +70,7 @@ impl Toc {
             .ok_or(Errors::NoCreationTime)
     }
 
+    /// Get what type of checksum was used for the Toc.
     pub fn checksum_type(&self) -> Result<&String, Errors> {
         self.checksum_element()?
             .attributes
@@ -60,6 +78,7 @@ impl Toc {
             .ok_or(Errors::NoChecksumType)
     }
 
+    /// Find out at which offset the checksum is.
     pub fn checksum_offset(&self) -> Result<usize, Error> {
         let re = self.checksum_element()?
             .get_child("offset")
@@ -71,6 +90,7 @@ impl Toc {
         Ok(re)
     }
 
+    /// Find out how many bytes the checksum is.
     pub fn checksum_size(&self) -> Result<usize, Error> {
         let re = self.checksum_element()?
             .get_child("size")
