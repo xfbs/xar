@@ -1,8 +1,8 @@
 use byteorder::{BigEndian, ReadBytesExt};
+use failure::Fail;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::io::Read;
-use failure::Fail;
 
 /// Minimal size of header.
 const HEADER_SIZE: usize = 28;

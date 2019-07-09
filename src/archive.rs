@@ -1,8 +1,8 @@
 use crate::header::Header;
 use crate::toc::Toc;
+use failure::Error;
 use std::fmt;
 use std::io::{Read, Seek};
-use failure::Error;
 
 #[derive(Debug, Clone)]
 pub struct Archive {

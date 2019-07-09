@@ -1,15 +1,15 @@
 extern crate xar;
 use clap::{App, Arg, ArgMatches, SubCommand};
+use failure::{Error, Fail};
 use std::fs::File;
 use xar::Archive;
-use failure::{Fail, Error};
+use xmltree::*;
 
 #[derive(Fail, Debug)]
 enum Errors {
     #[fail(display = "Argument missing.")]
-    ArgMissing
+    ArgMissing,
 }
-
 
 fn main() {
     let matches = App::new("xar")
@@ -65,23 +65,23 @@ fn run(matches: &ArgMatches) -> Result<(), Error> {
 }
 
 fn inspect(matches: &ArgMatches) -> Result<(), Error> {
-    let filename = matches
-        .value_of("FILE")
-        .ok_or(Errors::ArgMissing)?;
+    let filename = matches.value_of("FILE").ok_or(Errors::ArgMissing)?;
     let mut file = File::open(filename)?;
 
     let archive = Archive::from_read(&mut file)?;
 
     if matches.is_present("json") {
-        println!(
-            "{}",
-            archive
-                .header()
-                .to_json()?
-        );
+        println!("{}", archive.header().to_json()?);
     } else {
         println!("{}", &archive);
     }
+
+    let stdout = std::io::stdout();
+    let mut handle = stdout.lock();
+    let config = EmitterConfig::new()
+        .perform_indent(true)
+        .indent_string("  ");
+    archive.toc().data().write_with_config(handle, config)?;
 
     Ok(())
 }
