@@ -162,6 +162,26 @@ impl FileElement {
         }
     }
 
+    pub fn from_name(name: &str) -> Option<FileElement> {
+        use FileElement::*;
+        match name {
+            "data" => Some(Data),
+            "ctime" => Some(CTime),
+            "mtime" => Some(MTime),
+            "atime" => Some(ATime),
+            "group" => Some(Group),
+            "gid" => Some(GID),
+            "user" => Some(User),
+            "uid" => Some(UID),
+            "mode" => Some(Mode),
+            "inode" => Some(INode),
+            "type" => Some(Type),
+            "name" => Some(Name),
+            "deviceno" => Some(DeviceNo),
+            _ => None,
+        }
+    }
+
     pub fn error(&self) -> Errors {
         use FileElement::*;
         match self {
@@ -233,6 +253,83 @@ pub struct FileAttr {
     inode: Option<usize>,
 }
 
+impl FileAttr {
+    pub fn new() -> Self {
+        FileAttr {
+            name: None,
+            id: None,
+            ftype: None,
+            user: None,
+            group: None,
+            uid: None,
+            gid: None,
+            deviceno: None,
+            inode: None,
+        }
+    }
+
+    pub fn parse(data: &Element) -> FileAttr {
+        let mut attrs = FileAttr::new();
+
+        for child in &data.children {
+            let _ = attrs.parse_child(child);
+        }
+
+        attrs
+    }
+
+    fn parse_child(&mut self, child: &Element) -> Result<(), Errors> {
+        let e = FileElement::from_name(&child.name)
+            .ok_or(Errors::NoTocElement)?;
+
+        use FileElement::*;
+        match e {
+            Group => Self::parse_text(e, child, &mut self.group),
+            User  => Self::parse_text(e, child, &mut self.user),
+            Name  => Self::parse_text(e, child, &mut self.name),
+            Type  => Self::parse_type(e, child, &mut self.ftype),
+            Data  => self.parse_dummy(child),
+            CTime => self.parse_dummy(child),
+            MTime => self.parse_dummy(child),
+            ATime => self.parse_dummy(child),
+            GID   => Self::parse_usize(e, child, &mut self.gid),
+            UID   => Self::parse_usize(e, child, &mut self.uid),
+            Mode  => self.parse_dummy(child),
+            INode => Self::parse_usize(e, child, &mut self.inode),
+            DeviceNo => Self::parse_usize(e, child, &mut self.deviceno),
+        }
+    }
+
+    fn parse_text(element: FileElement, child: &Element, text: &mut Option<String>) -> Result<(), Errors> {
+        *text = child.text.clone();
+        Ok(())
+    }
+
+    fn parse_type(element: FileElement, child: &Element, ftype: &mut Option<FileType>) -> Result<(), Errors> {
+        if let Some(text) = &child.text {
+            if let Some(nftype) = FileType::from_str(text) {
+                *ftype = Some(nftype);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn parse_usize(element: FileElement, child: &Element, out: &mut Option<usize>) -> Result<(), Errors> {
+        let amt = child.text
+            .as_ref()
+            .ok_or(element.error())?
+            .parse::<usize>()
+            .or(Err(element.error()))?;
+        *out = Some(amt);
+        Ok(())
+    }
+
+    fn parse_dummy(&mut self, child: &Element) -> Result<(), Errors> {
+        Ok(())
+    }
+}
+
 /// File object.
 #[derive(Debug, Clone)]
 pub struct File<'a> {
@@ -246,6 +343,10 @@ impl<'a> File<'a> {
 
     pub fn files(&self) -> Files {
         Files { data: self.data }
+    }
+
+    pub fn attrs(&self) -> FileAttr {
+        FileAttr::parse(&self.data)
     }
 
     pub fn ftype(&self) -> Result<FileType, Errors> {

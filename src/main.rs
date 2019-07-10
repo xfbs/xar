@@ -120,6 +120,9 @@ fn list(matches: &ArgMatches) -> Result<(), Error> {
     let archive = Archive::from_read(&mut file)?;
 
     for file in archive.toc().files()?.iter() {
+        let attrs = file.attrs();
+        println!("{:?}", attrs);
+        /*
         println!("name {:?}", file.name());
         println!("id {:?}", file.id());
         println!("type {:?}", file.ftype());
@@ -132,6 +135,7 @@ fn list(matches: &ArgMatches) -> Result<(), Error> {
         println!("length {:?}", file.length());
         println!("offset {:?}", file.offset());
         println!("size {:?}", file.size());
+        */
     }
 
     Ok(())
