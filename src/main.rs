@@ -2,9 +2,9 @@ extern crate xar;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use failure::{Error, Fail};
 use std::fs::File;
+use std::path::*;
 use xar::Archive;
 use xmltree::*;
-use std::path::PathBuf;
 
 #[derive(Fail, Debug)]
 enum Errors {
@@ -38,8 +38,8 @@ fn main() {
                     Arg::with_name("compact")
                         .short("c")
                         .long("compact")
-                        .help("Don't pretty-print the TOC.")
-                )
+                        .help("Don't pretty-print the TOC."),
+                ),
         )
         .subcommand(
             SubCommand::with_name("dump-header")
@@ -71,11 +71,7 @@ fn main() {
                         .required(true)
                         .index(2),
                 )
-                .arg(
-                    Arg::with_name("json")
-                        .long("json")
-                        .help("Export as JSON."),
-                ),
+                .arg(Arg::with_name("json").long("json").help("Export as JSON.")),
         )
         .subcommand(
             SubCommand::with_name("list")
@@ -86,22 +82,18 @@ fn main() {
                         .required(true)
                         .index(1),
                 )
-                .arg(
-                    Arg::with_name("PATH")
-                        .help("The path to list.")
-                        .index(2),
-                )
+                .arg(Arg::with_name("PATH").help("The path to list.").index(2))
                 .arg(
                     Arg::with_name("long")
                         .short("l")
                         .long("long")
-                        .help("Show verbose output.")
+                        .help("Show verbose output."),
                 )
                 .arg(
                     Arg::with_name("all")
                         .short("a")
                         .long("all")
-                        .help("Recurse into directories.")
+                        .help("Recurse into directories."),
                 ),
         )
         .get_matches();
@@ -143,19 +135,16 @@ fn dump_toc(matches: &ArgMatches) -> Result<(), Error> {
 
 fn dump_file(matches: &ArgMatches) -> Result<(), Error> {
     let archive_name = matches.value_of("ARCHIVE").ok_or(Errors::ArgMissing)?;
-    let mut file = File::open(archive_name)?;
-
-    let archive = Archive::from_read(&mut file)?;
+    let mut archive_file = File::open(archive_name)?;
+    let archive = Archive::from_read(&mut archive_file)?;
 
     let filename = matches.value_of("FILE").ok_or(Errors::ArgMissing)?;
-
     let path = PathBuf::from(filename);
+    let mut files = archive.toc().files()?;
 
-    let files = archive.toc().files()?;
-
-    // TODO fix error.
-    let file = files.find(&path).ok_or(Errors::FileMissing(filename.into(), archive_name.into()))?;
-
+    let file = files
+        .find(&path)
+        .ok_or(Errors::FileMissing(filename.into(), archive_name.into()))?;
 
     Ok(())
 }

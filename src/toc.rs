@@ -3,8 +3,8 @@ use failure::*;
 use libflate::zlib::Decoder;
 use std::fmt;
 use std::io::{Read, Write};
+use std::path::{Component, Path, PathBuf};
 use xmltree::Element;
-use std::path::{PathBuf, Path, Component};
 
 #[derive(Fail, Debug)]
 pub enum Errors {
@@ -281,33 +281,40 @@ impl FileAttr {
     }
 
     fn parse_child(&mut self, child: &Element) -> Result<(), Errors> {
-        let e = FileElement::from_name(&child.name)
-            .ok_or(Errors::NoTocElement)?;
+        let e = FileElement::from_name(&child.name).ok_or(Errors::NoTocElement)?;
 
         use FileElement::*;
         match e {
             Group => Self::parse_text(e, child, &mut self.group),
-            User  => Self::parse_text(e, child, &mut self.user),
-            Name  => Self::parse_text(e, child, &mut self.name),
-            Type  => Self::parse_type(e, child, &mut self.ftype),
-            Data  => self.parse_dummy(child),
+            User => Self::parse_text(e, child, &mut self.user),
+            Name => Self::parse_text(e, child, &mut self.name),
+            Type => Self::parse_type(e, child, &mut self.ftype),
+            Data => self.parse_dummy(child),
             CTime => self.parse_dummy(child),
             MTime => self.parse_dummy(child),
             ATime => self.parse_dummy(child),
-            GID   => Self::parse_usize(e, child, &mut self.gid),
-            UID   => Self::parse_usize(e, child, &mut self.uid),
-            Mode  => self.parse_dummy(child),
+            GID => Self::parse_usize(e, child, &mut self.gid),
+            UID => Self::parse_usize(e, child, &mut self.uid),
+            Mode => self.parse_dummy(child),
             INode => Self::parse_usize(e, child, &mut self.inode),
             DeviceNo => Self::parse_usize(e, child, &mut self.deviceno),
         }
     }
 
-    fn parse_text(element: FileElement, child: &Element, text: &mut Option<String>) -> Result<(), Errors> {
+    fn parse_text(
+        element: FileElement,
+        child: &Element,
+        text: &mut Option<String>,
+    ) -> Result<(), Errors> {
         *text = child.text.clone();
         Ok(())
     }
 
-    fn parse_type(element: FileElement, child: &Element, ftype: &mut Option<FileType>) -> Result<(), Errors> {
+    fn parse_type(
+        element: FileElement,
+        child: &Element,
+        ftype: &mut Option<FileType>,
+    ) -> Result<(), Errors> {
         if let Some(text) = &child.text {
             if let Some(nftype) = FileType::from_str(text) {
                 *ftype = Some(nftype);
@@ -317,8 +324,13 @@ impl FileAttr {
         Ok(())
     }
 
-    fn parse_usize(element: FileElement, child: &Element, out: &mut Option<usize>) -> Result<(), Errors> {
-        let amt = child.text
+    fn parse_usize(
+        element: FileElement,
+        child: &Element,
+        out: &mut Option<usize>,
+    ) -> Result<(), Errors> {
+        let amt = child
+            .text
             .as_ref()
             .ok_or(element.error())?
             .parse::<usize>()
@@ -341,10 +353,13 @@ pub struct File<'a, 'b> {
 
 impl<'a, 'b> File<'a, 'b> {
     pub fn new(element: &'a Element, path: &'b Path) -> File<'a, 'b> {
-        File { data: element, path: path }
+        File {
+            data: element,
+            path: path,
+        }
     }
 
-    pub fn files(&self) -> Files {
+    pub fn files(&self) -> Files<'a> {
         let mut path = self.path.to_path_buf();
         let attrs = self.attrs();
         // TODO: what if no name?
@@ -379,13 +394,10 @@ impl<'a> Files<'a> {
         }
     }
 
-    pub fn find(&self, path: &Path) -> Option<File> {
-        let mut file = None;
+    pub fn find(&self, path: &Path) -> Option<Files> {
+        let mut files: Option<Files> = Some(self.clone());
 
-        for component in path.components() {
-        }
-
-        file
+        files
     }
 }
 
@@ -403,7 +415,10 @@ impl<'a, 'b> Iterator for FilesIter<'a, 'b> {
         for (i, child) in self.data.children.iter().enumerate().skip(self.pos) {
             if child.name == "file" {
                 self.pos = i + 1;
-                return Some(File { data: child, path: self.path });
+                return Some(File {
+                    data: child,
+                    path: self.path,
+                });
             }
         }
         None

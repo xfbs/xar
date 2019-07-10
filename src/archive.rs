@@ -2,10 +2,10 @@ use crate::header::Header;
 use crate::toc::Toc;
 use crate::*;
 use failure::Error;
-use std::fmt;
-use std::io::{Read, Seek};
 use libflate::zlib::Decoder;
+use std::fmt;
 use std::io::SeekFrom;
+use std::io::{Read, Seek};
 
 #[derive(Debug, Clone)]
 pub struct Archive {
