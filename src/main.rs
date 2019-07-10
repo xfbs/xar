@@ -4,11 +4,14 @@ use failure::{Error, Fail};
 use std::fs::File;
 use xar::Archive;
 use xmltree::*;
+use std::path::PathBuf;
 
 #[derive(Fail, Debug)]
 enum Errors {
     #[fail(display = "Argument missing.")]
     ArgMissing,
+    #[fail(display = "File ‘{}’ doesn't exist in archive ‘{}’.", _0, _1)]
+    FileMissing(String, String),
 }
 
 fn main() {
@@ -54,6 +57,27 @@ fn main() {
                 ),
         )
         .subcommand(
+            SubCommand::with_name("dump-file")
+                .about("Dumps all metadata of the given file.")
+                .arg(
+                    Arg::with_name("ARCHIVE")
+                        .help("The archive to read from.")
+                        .required(true)
+                        .index(1),
+                )
+                .arg(
+                    Arg::with_name("FILE")
+                        .help("While file to dump.")
+                        .required(true)
+                        .index(2),
+                )
+                .arg(
+                    Arg::with_name("json")
+                        .long("json")
+                        .help("Export as JSON."),
+                ),
+        )
+        .subcommand(
             SubCommand::with_name("list")
                 .about("Lists all the files in a XAR archive.")
                 .arg(
@@ -92,6 +116,7 @@ fn run(matches: &ArgMatches) -> Result<(), Error> {
     match matches.subcommand() {
         ("dump-header", Some(matches)) => dump_header(matches),
         ("dump-toc", Some(matches)) => dump_toc(matches),
+        ("dump-file", Some(matches)) => dump_file(matches),
         ("list", Some(matches)) => list(matches),
         (_, None) => default(&matches),
         (_, _) => unreachable!(),
@@ -115,6 +140,26 @@ fn dump_toc(matches: &ArgMatches) -> Result<(), Error> {
 
     Ok(())
 }
+
+fn dump_file(matches: &ArgMatches) -> Result<(), Error> {
+    let archive_name = matches.value_of("ARCHIVE").ok_or(Errors::ArgMissing)?;
+    let mut file = File::open(archive_name)?;
+
+    let archive = Archive::from_read(&mut file)?;
+
+    let filename = matches.value_of("FILE").ok_or(Errors::ArgMissing)?;
+
+    let path = PathBuf::from(filename);
+
+    let files = archive.toc().files()?;
+
+    // TODO fix error.
+    let file = files.find(&path).ok_or(Errors::FileMissing(filename.into(), archive_name.into()))?;
+
+
+    Ok(())
+}
+
 fn dump_header(matches: &ArgMatches) -> Result<(), Error> {
     let filename = matches.value_of("FILE").ok_or(Errors::ArgMissing)?;
     let mut file = File::open(filename)?;

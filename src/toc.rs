@@ -4,7 +4,7 @@ use libflate::zlib::Decoder;
 use std::fmt;
 use std::io::{Read, Write};
 use xmltree::Element;
-use std::path::{PathBuf, Path};
+use std::path::{PathBuf, Path, Component};
 
 #[derive(Fail, Debug)]
 pub enum Errors {
@@ -377,6 +377,15 @@ impl<'a> Files<'a> {
             path: &self.path,
             pos: 0,
         }
+    }
+
+    pub fn find(&self, path: &Path) -> Option<File> {
+        let mut file = None;
+
+        for component in path.components() {
+        }
+
+        file
     }
 }
 
