@@ -41,7 +41,7 @@ fn main() {
             SubCommand::with_name("list")
                 .about("Lists all the files in a XAR archive.")
                 .arg(
-                    Arg::with_name("INPUT")
+                    Arg::with_name("FILE")
                         .help("Sets the input file to use")
                         .required(true)
                         .index(1),
@@ -77,7 +77,7 @@ fn inspect(matches: &ArgMatches) -> Result<(), Error> {
     }
 
     let stdout = std::io::stdout();
-    let mut handle = stdout.lock();
+    let handle = stdout.lock();
     let config = EmitterConfig::new()
         .perform_indent(true)
         .indent_string("  ");
@@ -86,7 +86,20 @@ fn inspect(matches: &ArgMatches) -> Result<(), Error> {
     Ok(())
 }
 
-fn list(_matches: &ArgMatches) -> Result<(), Error> {
+fn list(matches: &ArgMatches) -> Result<(), Error> {
+    let filename = matches
+        .value_of("FILE")
+        .ok_or(Errors::ArgMissing)?;
+    let mut file = File::open(filename)?;
+
+    let archive = Archive::from_read(&mut file)?;
+
+    for file in archive.toc().files()?.iter() {
+        println!("name {:?}", file.name());
+        println!("id {:?}", file.id());
+        println!("type {:?}", file.ftype());
+    }
+
     Ok(())
 }
 

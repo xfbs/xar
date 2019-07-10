@@ -1,8 +1,8 @@
-use chrono::{DateTime, FixedOffset, Local, NaiveDateTime, TimeZone};
+use chrono::{NaiveDateTime};
 use failure::*;
 use libflate::zlib::Decoder;
 use std::fmt;
-use std::io::{BufRead, Read, Write};
+use std::io::{Read, Write};
 use xmltree::Element;
 
 #[derive(Fail, Debug)]
@@ -16,6 +16,12 @@ pub enum Errors {
     #[fail(display = "style attribute in <checksum> element missing.")]
     NoChecksumType,
     #[fail(display = "style attribute in <checksum> element missing.")]
+    NoFileTypeElement,
+    #[fail(display = "style attribute in <checksum> element missing.")]
+    NoFileNameElement,
+    #[fail(display = "style attribute in <checksum> element missing.")]
+    NoFileId,
+    #[fail(display = "style attribute in <checksum> element missing.")]
     ChecksumOffsetInvalid,
 }
 
@@ -25,22 +31,11 @@ pub struct Toc {
     data: Element,
 }
 
-/// File object.
-#[derive(Debug, Clone)]
-pub struct File<'a> {
-    data: &'a Element
-}
-
-/// Iterator over the files (in the current level).
-#[derive(Debug, Clone)]
-pub struct Files<'a> {
-    data: &'a Element,
-    offset: usize,
-}
-
 impl Toc {
     /// Contstruct a toc from a reader pointed at the start of it.
-    pub fn from_read<T: Read>(reader: &mut T, expected: usize) -> Result<Toc, Error> {
+    pub fn from_read<T: Read>(reader: &mut T, _expected: usize) -> Result<Toc, Error> {
+        // TODO: check expected toc size.
+
         let mut decoder = Decoder::new(reader).unwrap();
         let element = Element::parse(&mut decoder)?;
 
@@ -111,6 +106,10 @@ impl Toc {
     fn toc_element(&self) -> Result<&Element, Errors> {
         self.data.get_child("toc").ok_or(Errors::NoTocElement)
     }
+
+    pub fn files(&self) -> Result<Files, Errors> {
+        Ok(Files { data: self.toc_element()? })
+    }
 }
 
 impl std::fmt::Display for Toc {
@@ -121,3 +120,100 @@ impl std::fmt::Display for Toc {
         write!(f, "checksum-size {:?}\n", self.checksum_size())
     }
 }
+
+#[derive(Debug, Clone)]
+pub enum FileType {
+    File,
+    Directory,
+    CharacterSpecial,
+}
+
+/// File object.
+#[derive(Debug, Clone)]
+pub struct File<'a> {
+    data: &'a Element
+}
+
+impl<'a> File<'a> {
+    pub fn new(element: &'a Element) -> File {
+        File { data: element }
+    }
+
+    pub fn files(&self) -> Files {
+        Files { data: self.data }
+    }
+
+    pub fn ftype(&self) -> Result<FileType, Errors> {
+        let text = self.type_element()?
+            .text
+            .as_ref()
+            .ok_or(Errors::NoFileTypeElement)?;
+
+        match text.as_str() {
+            "directory" => Ok(FileType::Directory),
+            "file" => Ok(FileType::File),
+            "character special" => Ok(FileType::CharacterSpecial),
+            _ => Err(Errors::NoFileTypeElement),
+        }
+    }
+
+    pub fn id(&self) -> Result<usize, Error> {
+        Ok(self.data
+            .attributes
+            .get("id")
+            .ok_or(Errors::NoFileId)?
+            .parse::<usize>()?)
+    }
+
+    pub fn name(&self) -> Result<&String, Errors> {
+        Ok(self.name_element()?
+            .text
+            .as_ref()
+            .ok_or(Errors::NoFileNameElement)?)
+    }
+
+    fn type_element(&self) -> Result<&Element, Errors> {
+        self.data
+            .get_child("type")
+            .ok_or(Errors::NoFileTypeElement)
+    }
+
+    fn name_element(&self) -> Result<&Element, Errors> {
+        self.data
+            .get_child("name")
+            .ok_or(Errors::NoFileNameElement)
+    }
+}
+
+/// Iterator over the files (in the current level).
+#[derive(Debug, Clone)]
+pub struct Files<'a> {
+    data: &'a Element,
+}
+
+impl<'a> Files<'a> {
+    pub fn iter(&self) -> FilesIter {
+        FilesIter { data: self.data, pos: 0 }
+    }
+}
+
+/// Iterator over the files
+#[derive(Debug, Clone)]
+pub struct FilesIter<'a> {
+    data: &'a Element,
+    pos: usize,
+}
+
+impl<'a> Iterator for FilesIter<'a> {
+    type Item = File<'a>;
+    fn next(&mut self) -> Option<Self::Item> {
+        for (i, child) in self.data.children.iter().enumerate().skip(self.pos) {
+            if child.name == "file" {
+                self.pos = i + 1;
+                return Some(File { data: child });
+            }
+        }
+        None
+    }
+}
+
