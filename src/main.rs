@@ -61,6 +61,23 @@ fn main() {
                         .help("Sets the input file to use")
                         .required(true)
                         .index(1),
+                )
+                .arg(
+                    Arg::with_name("PATH")
+                        .help("The path to list.")
+                        .index(2),
+                )
+                .arg(
+                    Arg::with_name("long")
+                        .short("l")
+                        .long("long")
+                        .help("Show verbose output.")
+                )
+                .arg(
+                    Arg::with_name("all")
+                        .short("a")
+                        .long("all")
+                        .help("Recurse into directories.")
                 ),
         )
         .get_matches();
@@ -119,23 +136,34 @@ fn list(matches: &ArgMatches) -> Result<(), Error> {
 
     let archive = Archive::from_read(&mut file)?;
 
-    for file in archive.toc().files()?.iter() {
+    let long = matches.is_present("long");
+    let all = matches.is_present("all");
+
+    let files = archive.toc().files()?;
+
+    list_files(files, all, long)?;
+
+    Ok(())
+}
+
+fn list_files(files: xar::toc::Files, recurse: bool, long: bool) -> Result<(), Error> {
+    for file in files.iter() {
         let attrs = file.attrs();
-        println!("{:?}", attrs);
-        /*
-        println!("name {:?}", file.name());
-        println!("id {:?}", file.id());
-        println!("type {:?}", file.ftype());
-        println!("user {:?}", file.user());
-        println!("group {:?}", file.group());
-        println!("uid {:?}", file.uid());
-        println!("gid {:?}", file.gid());
-        println!("deviceno {:?}", file.deviceno());
-        println!("inode {:?}", file.inode());
-        println!("length {:?}", file.length());
-        println!("offset {:?}", file.offset());
-        println!("size {:?}", file.size());
-        */
+
+        if long {
+        } else {
+            if let Some(name) = attrs.name {
+                if recurse && file.path.components().count() != 0 {
+                    println!("{}/{}", file.path.display(), name);
+                } else {
+                    println!("{}", name);
+                }
+            }
+        }
+
+        if recurse {
+            list_files(file.files(), recurse, long)?;
+        }
     }
 
     Ok(())

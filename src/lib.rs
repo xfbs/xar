@@ -6,9 +6,9 @@ mod error {
     error_chain! {}
 }
 
-mod archive;
-mod header;
-mod toc;
+pub mod archive;
+pub mod header;
+pub mod toc;
 pub use archive::Archive;
 pub use header::Header;
 pub use toc::Toc;

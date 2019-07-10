@@ -4,6 +4,7 @@ use libflate::zlib::Decoder;
 use std::fmt;
 use std::io::{Read, Write};
 use xmltree::Element;
+use std::path::{PathBuf, Path};
 
 #[derive(Fail, Debug)]
 pub enum Errors {
@@ -112,6 +113,7 @@ impl Toc {
     pub fn files(&self) -> Result<Files, Errors> {
         Ok(Files {
             data: self.toc_element()?,
+            path: PathBuf::new(),
         })
     }
 }
@@ -242,15 +244,15 @@ impl FileType {
 
 #[derive(Debug, Clone)]
 pub struct FileAttr {
-    name: Option<String>,
-    id: Option<usize>,
-    ftype: Option<FileType>,
-    user: Option<String>,
-    group: Option<String>,
-    uid: Option<usize>,
-    gid: Option<usize>,
-    deviceno: Option<usize>,
-    inode: Option<usize>,
+    pub name: Option<String>,
+    pub id: Option<usize>,
+    pub ftype: Option<FileType>,
+    pub user: Option<String>,
+    pub group: Option<String>,
+    pub uid: Option<usize>,
+    pub gid: Option<usize>,
+    pub deviceno: Option<usize>,
+    pub inode: Option<usize>,
 }
 
 impl FileAttr {
@@ -332,115 +334,32 @@ impl FileAttr {
 
 /// File object.
 #[derive(Debug, Clone)]
-pub struct File<'a> {
+pub struct File<'a, 'b> {
     data: &'a Element,
+    pub path: &'b Path,
 }
 
-impl<'a> File<'a> {
-    pub fn new(element: &'a Element) -> File {
-        File { data: element }
+impl<'a, 'b> File<'a, 'b> {
+    pub fn new(element: &'a Element, path: &'b Path) -> File<'a, 'b> {
+        File { data: element, path: path }
     }
 
     pub fn files(&self) -> Files {
-        Files { data: self.data }
+        let mut path = self.path.to_path_buf();
+        let attrs = self.attrs();
+        // TODO: what if no name?
+        if let Some(name) = attrs.name {
+            path.push(name)
+        }
+
+        Files {
+            data: self.data,
+            path: path,
+        }
     }
 
     pub fn attrs(&self) -> FileAttr {
         FileAttr::parse(&self.data)
-    }
-
-    pub fn ftype(&self) -> Result<FileType, Errors> {
-        let text = self
-            .element(FileElement::Type)?
-            .text
-            .as_ref()
-            .ok_or(Errors::NoFileTypeElement)?;
-
-        FileType::from_str(text.as_str()).ok_or(Errors::NoFileTypeElement)
-    }
-
-    pub fn id(&self) -> Result<usize, Error> {
-        Ok(self
-            .data
-            .attributes
-            .get("id")
-            .ok_or(Errors::NoFileId)?
-            .parse::<usize>()?)
-    }
-
-    pub fn name(&self) -> Result<&String, Errors> {
-        self.element_text(FileElement::Name)
-    }
-
-    pub fn user(&self) -> Result<&String, Errors> {
-        self.element_text(FileElement::User)
-    }
-
-    pub fn group(&self) -> Result<&String, Errors> {
-        self.element_text(FileElement::Group)
-    }
-
-    pub fn uid(&self) -> Result<usize, Error> {
-        self.element_text_usize(FileElement::UID)
-    }
-
-    pub fn gid(&self) -> Result<usize, Error> {
-        self.element_text_usize(FileElement::GID)
-    }
-
-    pub fn deviceno(&self) -> Result<usize, Error> {
-        self.element_text_usize(FileElement::DeviceNo)
-    }
-
-    pub fn inode(&self) -> Result<usize, Error> {
-        self.element_text_usize(FileElement::INode)
-    }
-
-    pub fn length(&self) -> Result<usize, Error> {
-        self.data_element_text_usize(FileDataElement::Length)
-    }
-
-    pub fn offset(&self) -> Result<usize, Error> {
-        self.data_element_text_usize(FileDataElement::Offset)
-    }
-
-    pub fn size(&self) -> Result<usize, Error> {
-        self.data_element_text_usize(FileDataElement::Size)
-    }
-
-    fn element(&self, element: FileElement) -> Result<&Element, Errors> {
-        self.data.get_child(element.name()).ok_or(element.error())
-    }
-
-    fn data_element(&self, element: FileDataElement) -> Result<&Element, Errors> {
-        self.element(FileElement::Data)?
-            .get_child(element.name()).ok_or(element.error())
-    }
-
-    fn element_text(&self, element: FileElement) -> Result<&String, Errors> {
-        Ok(self.element(element)?
-           .text
-           .as_ref()
-           .ok_or(element.error())?)
-    }
-
-    fn data_element_text(&self, element: FileDataElement) -> Result<&String, Errors> {
-        Ok(self.data_element(element)?
-           .text
-           .as_ref()
-           .ok_or(element.error())?)
-    }
-
-    fn element_text_usize(&self, element: FileElement) -> Result<usize, Error> {
-        let ret = self.element_text(element)?
-            .parse::<usize>()?;
-        Ok(ret)
-    }
-
-    fn data_element_text_usize(&self, element: FileDataElement) -> Result<usize, Error> {
-        let ret = self.data_element_text(element)?
-            .parse::<usize>()?;
-        Ok(ret)
     }
 }
 
@@ -448,12 +367,14 @@ impl<'a> File<'a> {
 #[derive(Debug, Clone)]
 pub struct Files<'a> {
     data: &'a Element,
+    path: PathBuf,
 }
 
 impl<'a> Files<'a> {
     pub fn iter(&self) -> FilesIter {
         FilesIter {
             data: self.data,
+            path: &self.path,
             pos: 0,
         }
     }
@@ -461,18 +382,19 @@ impl<'a> Files<'a> {
 
 /// Iterator over the files
 #[derive(Debug, Clone)]
-pub struct FilesIter<'a> {
+pub struct FilesIter<'a, 'b> {
     data: &'a Element,
+    path: &'b Path,
     pos: usize,
 }
 
-impl<'a> Iterator for FilesIter<'a> {
-    type Item = File<'a>;
+impl<'a, 'b> Iterator for FilesIter<'a, 'b> {
+    type Item = File<'a, 'b>;
     fn next(&mut self) -> Option<Self::Item> {
         for (i, child) in self.data.children.iter().enumerate().skip(self.pos) {
             if child.name == "file" {
                 self.pos = i + 1;
-                return Some(File { data: child });
+                return Some(File { data: child, path: self.path });
             }
         }
         None
