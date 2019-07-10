@@ -1,4 +1,4 @@
-use chrono::{NaiveDateTime};
+use chrono::NaiveDateTime;
 use failure::*;
 use libflate::zlib::Decoder;
 use std::fmt;
@@ -36,7 +36,7 @@ impl Toc {
     pub fn from_read<T: Read>(reader: &mut T, _expected: usize) -> Result<Toc, Error> {
         // TODO: check expected toc size.
 
-        let mut decoder = Decoder::new(reader).unwrap();
+        let mut decoder = Decoder::new(reader)?;
         let element = Element::parse(&mut decoder)?;
 
         Ok(Toc { data: element })
@@ -75,7 +75,8 @@ impl Toc {
 
     /// Find out at which offset the checksum is.
     pub fn checksum_offset(&self) -> Result<usize, Error> {
-        let re = self.checksum_element()?
+        let re = self
+            .checksum_element()?
             .get_child("offset")
             .ok_or(Errors::ChecksumOffsetInvalid)?
             .text
@@ -87,7 +88,8 @@ impl Toc {
 
     /// Find out how many bytes the checksum is.
     pub fn checksum_size(&self) -> Result<usize, Error> {
-        let re = self.checksum_element()?
+        let re = self
+            .checksum_element()?
             .get_child("size")
             .ok_or(Errors::ChecksumOffsetInvalid)?
             .text
@@ -108,7 +110,9 @@ impl Toc {
     }
 
     pub fn files(&self) -> Result<Files, Errors> {
-        Ok(Files { data: self.toc_element()? })
+        Ok(Files {
+            data: self.toc_element()?,
+        })
     }
 }
 
@@ -121,17 +125,118 @@ impl std::fmt::Display for Toc {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Copy)]
+pub enum FileElement {
+    Data,
+    CTime,
+    MTime,
+    ATime,
+    Group,
+    GID,
+    User,
+    UID,
+    Mode,
+    INode,
+    Type,
+    Name,
+    DeviceNo,
+}
+
+impl FileElement {
+    pub fn name(&self) -> &'static str {
+        use FileElement::*;
+        match self {
+            Data => "data",
+            CTime => "ctime",
+            MTime => "mtime",
+            ATime => "atime",
+            Group => "group",
+            GID => "gid",
+            User => "user",
+            UID => "uid",
+            Mode => "mode",
+            INode => "inode",
+            Type => "type",
+            Name => "name",
+            DeviceNo => "deviceno",
+        }
+    }
+
+    pub fn error(&self) -> Errors {
+        use FileElement::*;
+        match self {
+            _ => Errors::NoFileTypeElement,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum FileDataElement {
+    Length,
+    Offset,
+    Size,
+    Encoding,
+    ExtractedChecksum,
+    ArchivedChecksum,
+}
+
+impl FileDataElement {
+    pub fn name(&self) -> &'static str {
+        use FileDataElement::*;
+        match self {
+            Length => "length",
+            Offset => "offset",
+            Size => "size",
+            Encoding => "encoding",
+            ExtractedChecksum => "extracted-checksum",
+            ArchivedChecksum => "archived-checksum",
+        }
+    }
+
+    pub fn error(&self) -> Errors {
+        use FileElement::*;
+        match self {
+            _ => Errors::NoFileTypeElement,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub enum FileType {
     File,
     Directory,
     CharacterSpecial,
 }
 
+impl FileType {
+    pub fn from_str(name: &str) -> Option<FileType> {
+        use FileType::*;
+        match name {
+            "file" => Some(File),
+            "directory" => Some(Directory),
+            "character special" => Some(CharacterSpecial),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FileAttr {
+    name: Option<String>,
+    id: Option<usize>,
+    ftype: Option<FileType>,
+    user: Option<String>,
+    group: Option<String>,
+    uid: Option<usize>,
+    gid: Option<usize>,
+    deviceno: Option<usize>,
+    inode: Option<usize>,
+}
+
 /// File object.
 #[derive(Debug, Clone)]
 pub struct File<'a> {
-    data: &'a Element
+    data: &'a Element,
 }
 
 impl<'a> File<'a> {
@@ -144,21 +249,18 @@ impl<'a> File<'a> {
     }
 
     pub fn ftype(&self) -> Result<FileType, Errors> {
-        let text = self.type_element()?
+        let text = self
+            .element(FileElement::Type)?
             .text
             .as_ref()
             .ok_or(Errors::NoFileTypeElement)?;
 
-        match text.as_str() {
-            "directory" => Ok(FileType::Directory),
-            "file" => Ok(FileType::File),
-            "character special" => Ok(FileType::CharacterSpecial),
-            _ => Err(Errors::NoFileTypeElement),
-        }
+        FileType::from_str(text.as_str()).ok_or(Errors::NoFileTypeElement)
     }
 
     pub fn id(&self) -> Result<usize, Error> {
-        Ok(self.data
+        Ok(self
+            .data
             .attributes
             .get("id")
             .ok_or(Errors::NoFileId)?
@@ -166,22 +268,78 @@ impl<'a> File<'a> {
     }
 
     pub fn name(&self) -> Result<&String, Errors> {
-        Ok(self.name_element()?
-            .text
-            .as_ref()
-            .ok_or(Errors::NoFileNameElement)?)
+        self.element_text(FileElement::Name)
     }
 
-    fn type_element(&self) -> Result<&Element, Errors> {
-        self.data
-            .get_child("type")
-            .ok_or(Errors::NoFileTypeElement)
+    pub fn user(&self) -> Result<&String, Errors> {
+        self.element_text(FileElement::User)
     }
 
-    fn name_element(&self) -> Result<&Element, Errors> {
-        self.data
-            .get_child("name")
-            .ok_or(Errors::NoFileNameElement)
+    pub fn group(&self) -> Result<&String, Errors> {
+        self.element_text(FileElement::Group)
+    }
+
+    pub fn uid(&self) -> Result<usize, Error> {
+        self.element_text_usize(FileElement::UID)
+    }
+
+    pub fn gid(&self) -> Result<usize, Error> {
+        self.element_text_usize(FileElement::GID)
+    }
+
+    pub fn deviceno(&self) -> Result<usize, Error> {
+        self.element_text_usize(FileElement::DeviceNo)
+    }
+
+    pub fn inode(&self) -> Result<usize, Error> {
+        self.element_text_usize(FileElement::INode)
+    }
+
+    pub fn length(&self) -> Result<usize, Error> {
+        self.data_element_text_usize(FileDataElement::Length)
+    }
+
+    pub fn offset(&self) -> Result<usize, Error> {
+        self.data_element_text_usize(FileDataElement::Offset)
+    }
+
+    pub fn size(&self) -> Result<usize, Error> {
+        self.data_element_text_usize(FileDataElement::Size)
+    }
+
+    fn element(&self, element: FileElement) -> Result<&Element, Errors> {
+        self.data.get_child(element.name()).ok_or(element.error())
+    }
+
+    fn data_element(&self, element: FileDataElement) -> Result<&Element, Errors> {
+        self.element(FileElement::Data)?
+            .get_child(element.name()).ok_or(element.error())
+    }
+
+    fn element_text(&self, element: FileElement) -> Result<&String, Errors> {
+        Ok(self.element(element)?
+           .text
+           .as_ref()
+           .ok_or(element.error())?)
+    }
+
+    fn data_element_text(&self, element: FileDataElement) -> Result<&String, Errors> {
+        Ok(self.data_element(element)?
+           .text
+           .as_ref()
+           .ok_or(element.error())?)
+    }
+
+    fn element_text_usize(&self, element: FileElement) -> Result<usize, Error> {
+        let ret = self.element_text(element)?
+            .parse::<usize>()?;
+        Ok(ret)
+    }
+
+    fn data_element_text_usize(&self, element: FileDataElement) -> Result<usize, Error> {
+        let ret = self.data_element_text(element)?
+            .parse::<usize>()?;
+        Ok(ret)
     }
 }
 
@@ -193,7 +351,10 @@ pub struct Files<'a> {
 
 impl<'a> Files<'a> {
     pub fn iter(&self) -> FilesIter {
-        FilesIter { data: self.data, pos: 0 }
+        FilesIter {
+            data: self.data,
+            pos: 0,
+        }
     }
 }
 
@@ -216,4 +377,3 @@ impl<'a> Iterator for FilesIter<'a> {
         None
     }
 }
-
