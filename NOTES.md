@@ -1,5 +1,17 @@
 # Notes
 
+## Features
+
+* [ ] `dump-header` to parse and view the header.
+* [ ] `dump-toc` to parse and view the toc.
+* [ ] `dump-file` to view all metadata known about a file.
+* [ ] `list-files` to list all files in an archive, simlar to `ls` and `ls -lah`.
+* [ ] `verify` to check if an archive has any errors.
+* [ ] `extract` to extract all (or some) files from an archive.
+* [ ] `create` to create an archive from a set of files.
+* [ ] `create` to add files to an existing archive.
+* [ ] `rebuild` to rebuild an archive (using different checksums, compression and compacting the heap).
+
 ## Todo
 
 ### Change to using xmltree and xml-rs
