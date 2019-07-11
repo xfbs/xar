@@ -14,7 +14,7 @@
 
 ## Todo
 
-### Change to using xmltree and xml-rs
+### [DONE] Change to using xmltree and xml-rs
 
 It's easier.
 
