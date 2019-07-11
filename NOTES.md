@@ -2,8 +2,8 @@
 
 ## Features
 
-* [ ] `dump-header` to parse and view the header.
-* [ ] `dump-toc` to parse and view the toc.
+* [x] `dump-header` to parse and view the header.
+* [x] `dump-toc` to parse and view the toc.
 * [ ] `dump-file` to view all metadata known about a file.
 * [ ] `list-files` to list all files in an archive, simlar to `ls` and `ls -lah`.
 * [ ] `verify` to check if an archive has any errors.
