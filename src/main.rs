@@ -158,7 +158,7 @@ fn dump_header(matches: &ArgMatches) -> Result<(), Error> {
     if matches.is_present("json") {
         println!("{}", archive.header().to_json()?);
     } else {
-        println!("{}", &archive);
+        println!("{}", &archive.header());
     }
 
     Ok(())

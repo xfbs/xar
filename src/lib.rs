@@ -1,11 +1,6 @@
 #[cfg(test)]
 mod tests;
 
-mod error {
-    use error_chain::error_chain;
-    error_chain! {}
-}
-
 pub mod archive;
 pub mod header;
 pub mod toc;
