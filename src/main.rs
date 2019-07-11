@@ -1,5 +1,5 @@
 extern crate xar;
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgMatches, SubCommand, AppSettings};
 use failure::{Error, Fail};
 use std::fs::File;
 use std::path::*;
@@ -15,10 +15,11 @@ enum Errors {
 }
 
 fn main() {
-    let matches = App::new("xar")
-        .version("0.1.0")
-        .author("Patrick Elsen <pelsen@xfbs.net>")
-        .about("Create, inspect and extract XAR archives.")
+    let matches = App::new(env!("CARGO_PKG_NAME"))
+        .version(env!("CARGO_PKG_VERSION"))
+        .author(env!("CARGO_PKG_AUTHORS"))
+        .about(env!("CARGO_PKG_DESCRIPTION"))
+        .setting(AppSettings::ArgRequiredElseHelp)
         .arg(
             Arg::with_name("v")
                 .short("v")
@@ -140,9 +141,9 @@ fn dump_file(matches: &ArgMatches) -> Result<(), Error> {
 
     let filename = matches.value_of("FILE").ok_or(Errors::ArgMissing)?;
     let path = PathBuf::from(filename);
-    let mut files = archive.toc().files()?;
+    let files = archive.toc().files()?;
 
-    let file = files
+    let _file = files
         .find(&path)
         .ok_or(Errors::FileMissing(filename.into(), archive_name.into()))?;
 
