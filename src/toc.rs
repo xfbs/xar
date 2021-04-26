@@ -35,7 +35,7 @@ impl Toc {
     /// Compute creation time of Toc.
     pub fn creation_time(&self) -> Result<NaiveDateTime, Error> {
         let time = self.creation_time_element()?;
-        let text = time.text.as_ref().ok_or(Error::CreationTimeMissing)?;
+        let text = time.get_text().ok_or(Error::CreationTimeMissing)?;
         let parsed = NaiveDateTime::parse_from_str(&text, "%Y-%m-%dT%H:%M:%S").map_err(Error::CreationTimeParseFailed)?;
         Ok(parsed)
     }
@@ -60,8 +60,7 @@ impl Toc {
             .checksum_element()?
             .get_child("offset")
             .ok_or(Error::ChecksumOffsetInvalid)?
-            .text
-            .as_ref()
+            .get_text()
             .ok_or(Error::ChecksumOffsetInvalid)?
             .parse::<usize>()
             .map_err(Error::ChecksumOffsetParseFailed)
@@ -73,8 +72,7 @@ impl Toc {
             .checksum_element()?
             .get_child("size")
             .ok_or(Error::ChecksumSizeInvalid)?
-            .text
-            .as_ref()
+            .get_text()
             .ok_or(Error::ChecksumSizeInvalid)?
             .parse::<usize>()
             .map_err(Error::ChecksumSizeParseFailed)
@@ -252,7 +250,9 @@ impl FileAttr {
         let mut attrs = FileAttr::new();
 
         for child in &data.children {
-            let _ = attrs.parse_child(child);
+            if let Some(child_element) = child.as_element() {
+              let _ = attrs.parse_child(child_element);
+            }
         }
 
         attrs
@@ -283,7 +283,7 @@ impl FileAttr {
         child: &Element,
         text: &mut Option<String>,
     ) -> Result<(), Error> {
-        *text = child.text.clone();
+        *text = child.get_text().map(|s|s.into_owned());
         Ok(())
     }
 
@@ -291,7 +291,7 @@ impl FileAttr {
         child: &Element,
         ftype: &mut Option<FileType>,
     ) -> Result<(), Error> {
-        if let Some(text) = &child.text {
+        if let Some(text) = &child.get_text() {
             if let Some(nftype) = FileType::from_str(text) {
                 *ftype = Some(nftype);
             }
@@ -306,8 +306,7 @@ impl FileAttr {
         out: &mut Option<usize>,
     ) -> Result<(), Error> {
         let amt = child
-            .text
-            .as_ref()
+            .get_text()
             .ok_or(element.error())?
             .parse::<usize>()
             .or(Err(element.error()))?;
@@ -388,12 +387,14 @@ impl<'a, 'b> Iterator for FilesIter<'a, 'b> {
     type Item = File<'a, 'b>;
     fn next(&mut self) -> Option<Self::Item> {
         for (i, child) in self.data.children.iter().enumerate().skip(self.pos) {
-            if child.name == "file" {
-                self.pos = i + 1;
-                return Some(File {
-                    data: child,
-                    path: self.path,
-                });
+            if let Some(child_element) = child.as_element() {
+                if child_element.name == "file" {
+                    self.pos = i + 1;
+                    return Some(File {
+                        data: child_element,
+                        path: self.path,
+                    });
+                }
             }
         }
         None
