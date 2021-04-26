@@ -1,16 +1,16 @@
 extern crate xar;
+use anyhow::Error;
 use clap::{App, Arg, ArgMatches, SubCommand, AppSettings};
-use failure::{Error, Fail};
 use std::fs::File;
 use std::path::*;
 use xar::Archive;
 use xmltree::*;
 
-#[derive(Fail, Debug)]
-enum Errors {
-    #[fail(display = "Argument missing.")]
+#[derive(thiserror::Error, Debug)]
+enum AppError {
+    #[error("Argument missing.")]
     ArgMissing,
-    #[fail(display = "File ‘{}’ doesn't exist in archive ‘{}’.", _0, _1)]
+    #[error("File ‘{0}’ doesn't exist in archive ‘{1}’.")]
     FileMissing(String, String),
 }
 
@@ -117,7 +117,7 @@ fn run(matches: &ArgMatches) -> Result<(), Error> {
 }
 
 fn dump_toc(matches: &ArgMatches) -> Result<(), Error> {
-    let filename = matches.value_of("FILE").ok_or(Errors::ArgMissing)?;
+    let filename = matches.value_of("FILE").ok_or(AppError::ArgMissing)?;
     let mut file = File::open(filename)?;
 
     let archive = Archive::from_read(&mut file)?;
@@ -135,23 +135,23 @@ fn dump_toc(matches: &ArgMatches) -> Result<(), Error> {
 }
 
 fn dump_file(matches: &ArgMatches) -> Result<(), Error> {
-    let archive_name = matches.value_of("ARCHIVE").ok_or(Errors::ArgMissing)?;
+    let archive_name = matches.value_of("ARCHIVE").ok_or(AppError::ArgMissing)?;
     let mut archive_file = File::open(archive_name)?;
     let archive = Archive::from_read(&mut archive_file)?;
 
-    let filename = matches.value_of("FILE").ok_or(Errors::ArgMissing)?;
+    let filename = matches.value_of("FILE").ok_or(AppError::ArgMissing)?;
     let path = PathBuf::from(filename);
     let files = archive.toc().files()?;
 
     let _file = files
         .find(&path)
-        .ok_or(Errors::FileMissing(filename.into(), archive_name.into()))?;
+        .ok_or(AppError::FileMissing(filename.into(), archive_name.into()))?;
 
     Ok(())
 }
 
 fn dump_header(matches: &ArgMatches) -> Result<(), Error> {
-    let filename = matches.value_of("FILE").ok_or(Errors::ArgMissing)?;
+    let filename = matches.value_of("FILE").ok_or(AppError::ArgMissing)?;
     let mut file = File::open(filename)?;
 
     let archive = Archive::from_read(&mut file)?;
@@ -166,7 +166,7 @@ fn dump_header(matches: &ArgMatches) -> Result<(), Error> {
 }
 
 fn list(matches: &ArgMatches) -> Result<(), Error> {
-    let filename = matches.value_of("FILE").ok_or(Errors::ArgMissing)?;
+    let filename = matches.value_of("FILE").ok_or(AppError::ArgMissing)?;
     let mut file = File::open(filename)?;
 
     let archive = Archive::from_read(&mut file)?;

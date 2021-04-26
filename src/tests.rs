@@ -1,5 +1,6 @@
 use crate::header;
 use crate::Header;
+use crate::Error;
 use std::io::Cursor;
 
 const NULL_XAR: &'static [u8] =
@@ -58,7 +59,10 @@ fn test_header_load_fails_with_invalid_magic() {
         copy[i] = copy[i] + 1;
         let mut cursor = Cursor::new(&copy);
         let header = Header::from_read(&mut cursor).unwrap();
-        assert_eq!(header.check(), Err(header::Error::MagicError));
+        match header.check() {
+            Err(Error::MagicError) => {},
+            _ => panic!("Unexpected header magic")
+        }
     }
 }
 
@@ -69,5 +73,8 @@ fn test_header_load_fails_with_invalid_version() {
     copy[7] = 0;
     let mut cursor = Cursor::new(&copy);
     let header = Header::from_read(&mut cursor).unwrap();
-    assert_eq!(header.check(), Err(header::Error::Version(0)));
+    match header.check() {
+        Err(Error::Version(0)) => {},
+        _ => panic!("Unexpected version"),
+    }
 }

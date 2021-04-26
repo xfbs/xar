@@ -1,30 +1,10 @@
 use chrono::NaiveDateTime;
-use failure::*;
 use libflate::zlib::Decoder;
 use std::fmt;
 use std::io::{Read, Write};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use xmltree::Element;
-
-#[derive(Fail, Debug)]
-pub enum Errors {
-    #[fail(display = "<toc> element doesn't exist in Toc.")]
-    NoTocElement,
-    #[fail(display = "<creation-time> element doesn't exist in Toc.")]
-    NoCreationTime,
-    #[fail(display = "<checksum> element missing.")]
-    NoChecksumElement,
-    #[fail(display = "style attribute in <checksum> element missing.")]
-    NoChecksumType,
-    #[fail(display = "style attribute in <checksum> element missing.")]
-    NoFileTypeElement,
-    #[fail(display = "style attribute in <checksum> element missing.")]
-    NoFileNameElement,
-    #[fail(display = "style attribute in <checksum> element missing.")]
-    NoFileId,
-    #[fail(display = "style attribute in <checksum> element missing.")]
-    ChecksumOffsetInvalid,
-}
+use super::Error;
 
 /// Table of contents.
 #[derive(Debug, Clone)]
@@ -37,8 +17,8 @@ impl Toc {
     pub fn from_read<T: Read>(reader: &mut T, _expected: usize) -> Result<Toc, Error> {
         // TODO: check expected toc size.
 
-        let mut decoder = Decoder::new(reader)?;
-        let element = Element::parse(&mut decoder)?;
+        let mut decoder = Decoder::new(reader).map_err(Error::DecompressionFailed)?;
+        let element = Element::parse(&mut decoder).map_err(Error::RootElementInvalid)?;
 
         Ok(Toc { data: element })
     }
@@ -55,62 +35,60 @@ impl Toc {
     /// Compute creation time of Toc.
     pub fn creation_time(&self) -> Result<NaiveDateTime, Error> {
         let time = self.creation_time_element()?;
-        let text = time.text.as_ref().ok_or(Errors::NoCreationTime)?;
-        let parsed = NaiveDateTime::parse_from_str(&text, "%Y-%m-%dT%H:%M:%S")?;
+        let text = time.get_text().ok_or(Error::CreationTimeMissing)?;
+        let parsed = NaiveDateTime::parse_from_str(&text, "%Y-%m-%dT%H:%M:%S").map_err(Error::CreationTimeParseFailed)?;
         Ok(parsed)
     }
 
-    fn creation_time_element(&self) -> Result<&Element, Errors> {
+    fn creation_time_element(&self) -> Result<&Element, Error> {
         self.toc_element()?
             .get_child("creation-time")
-            .ok_or(Errors::NoCreationTime)
+            .ok_or(Error::CreationTimeMissing)
     }
 
     /// Get what type of checksum was used for the Toc.
-    pub fn checksum_type(&self) -> Result<&String, Errors> {
+    pub fn checksum_type(&self) -> Result<&String, Error> {
         self.checksum_element()?
             .attributes
             .get("style")
-            .ok_or(Errors::NoChecksumType)
+            .ok_or(Error::ChecksumTypeMissing)
     }
 
     /// Find out at which offset the checksum is.
     pub fn checksum_offset(&self) -> Result<usize, Error> {
-        let re = self
+        self
             .checksum_element()?
             .get_child("offset")
-            .ok_or(Errors::ChecksumOffsetInvalid)?
-            .text
-            .as_ref()
-            .ok_or(Errors::ChecksumOffsetInvalid)?
-            .parse::<usize>()?;
-        Ok(re)
+            .ok_or(Error::ChecksumOffsetInvalid)?
+            .get_text()
+            .ok_or(Error::ChecksumOffsetInvalid)?
+            .parse::<usize>()
+            .map_err(Error::ChecksumOffsetParseFailed)
     }
 
     /// Find out how many bytes the checksum is.
     pub fn checksum_size(&self) -> Result<usize, Error> {
-        let re = self
+        self
             .checksum_element()?
             .get_child("size")
-            .ok_or(Errors::ChecksumOffsetInvalid)?
-            .text
-            .as_ref()
-            .ok_or(Errors::ChecksumOffsetInvalid)?
-            .parse::<usize>()?;
-        Ok(re)
+            .ok_or(Error::ChecksumSizeInvalid)?
+            .get_text()
+            .ok_or(Error::ChecksumSizeInvalid)?
+            .parse::<usize>()
+            .map_err(Error::ChecksumSizeParseFailed)
     }
 
-    fn checksum_element(&self) -> Result<&Element, Errors> {
+    fn checksum_element(&self) -> Result<&Element, Error> {
         self.toc_element()?
             .get_child("checksum")
-            .ok_or(Errors::NoChecksumElement)
+            .ok_or(Error::ChecksumElementMissing)
     }
 
-    fn toc_element(&self) -> Result<&Element, Errors> {
-        self.data.get_child("toc").ok_or(Errors::NoTocElement)
+    fn toc_element(&self) -> Result<&Element, Error> {
+        self.data.get_child("toc").ok_or(Error::TocElementMissing)
     }
 
-    pub fn files(&self) -> Result<Files, Errors> {
+    pub fn files(&self) -> Result<Files, Error> {
         Ok(Files {
             data: self.toc_element()?,
             path: PathBuf::new(),
@@ -184,10 +162,9 @@ impl FileElement {
         }
     }
 
-    pub fn error(&self) -> Errors {
-        use FileElement::*;
+    pub fn error(&self) -> Error {
         match self {
-            _ => Errors::NoFileTypeElement,
+            _ => Error::FileTypeElementMissing,
         }
     }
 }
@@ -215,10 +192,9 @@ impl FileDataElement {
         }
     }
 
-    pub fn error(&self) -> Errors {
-        use FileElement::*;
+    pub fn error(&self) -> Error {
         match self {
-            _ => Errors::NoFileTypeElement,
+            _ => Error::FileTypeElementMissing,
         }
     }
 }
@@ -274,48 +250,48 @@ impl FileAttr {
         let mut attrs = FileAttr::new();
 
         for child in &data.children {
-            let _ = attrs.parse_child(child);
+            if let Some(child_element) = child.as_element() {
+              let _ = attrs.parse_child(child_element);
+            }
         }
 
         attrs
     }
 
-    fn parse_child(&mut self, child: &Element) -> Result<(), Errors> {
-        let e = FileElement::from_name(&child.name).ok_or(Errors::NoTocElement)?;
+    fn parse_child(&mut self, child: &Element) -> Result<(), Error> {
+        let e = FileElement::from_name(&child.name).ok_or(Error::TocElementMissing)?;
 
         use FileElement::*;
         match e {
-            Group => Self::parse_text(e, child, &mut self.group),
-            User => Self::parse_text(e, child, &mut self.user),
-            Name => Self::parse_text(e, child, &mut self.name),
-            Type => Self::parse_type(e, child, &mut self.ftype),
-            Data => self.parse_dummy(child),
-            CTime => self.parse_dummy(child),
-            MTime => self.parse_dummy(child),
-            ATime => self.parse_dummy(child),
+            Group => Self::parse_text(child, &mut self.group),
+            User => Self::parse_text(child, &mut self.user),
+            Name => Self::parse_text(child, &mut self.name),
+            Type => Self::parse_type(child, &mut self.ftype),
+            Data => self.parse_dummy(),
+            CTime => self.parse_dummy(),
+            MTime => self.parse_dummy(),
+            ATime => self.parse_dummy(),
             GID => Self::parse_usize(e, child, &mut self.gid),
             UID => Self::parse_usize(e, child, &mut self.uid),
-            Mode => self.parse_dummy(child),
+            Mode => self.parse_dummy(),
             INode => Self::parse_usize(e, child, &mut self.inode),
             DeviceNo => Self::parse_usize(e, child, &mut self.deviceno),
         }
     }
 
     fn parse_text(
-        element: FileElement,
         child: &Element,
         text: &mut Option<String>,
-    ) -> Result<(), Errors> {
-        *text = child.text.clone();
+    ) -> Result<(), Error> {
+        *text = child.get_text().map(|s|s.into_owned());
         Ok(())
     }
 
     fn parse_type(
-        element: FileElement,
         child: &Element,
         ftype: &mut Option<FileType>,
-    ) -> Result<(), Errors> {
-        if let Some(text) = &child.text {
+    ) -> Result<(), Error> {
+        if let Some(text) = &child.get_text() {
             if let Some(nftype) = FileType::from_str(text) {
                 *ftype = Some(nftype);
             }
@@ -328,10 +304,9 @@ impl FileAttr {
         element: FileElement,
         child: &Element,
         out: &mut Option<usize>,
-    ) -> Result<(), Errors> {
+    ) -> Result<(), Error> {
         let amt = child
-            .text
-            .as_ref()
+            .get_text()
             .ok_or(element.error())?
             .parse::<usize>()
             .or(Err(element.error()))?;
@@ -339,7 +314,7 @@ impl FileAttr {
         Ok(())
     }
 
-    fn parse_dummy(&mut self, child: &Element) -> Result<(), Errors> {
+    fn parse_dummy(&mut self) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -395,9 +370,8 @@ impl<'a> Files<'a> {
     }
 
     pub fn find(&self, path: &Path) -> Option<Files> {
-        let mut files: Option<Files> = Some(self.clone());
-
-        files
+        // TODO: Implement this
+        Some(self.clone())
     }
 }
 
@@ -413,12 +387,14 @@ impl<'a, 'b> Iterator for FilesIter<'a, 'b> {
     type Item = File<'a, 'b>;
     fn next(&mut self) -> Option<Self::Item> {
         for (i, child) in self.data.children.iter().enumerate().skip(self.pos) {
-            if child.name == "file" {
-                self.pos = i + 1;
-                return Some(File {
-                    data: child,
-                    path: self.path,
-                });
+            if let Some(child_element) = child.as_element() {
+                if child_element.name == "file" {
+                    self.pos = i + 1;
+                    return Some(File {
+                        data: child_element,
+                        path: self.path,
+                    });
+                }
             }
         }
         None
