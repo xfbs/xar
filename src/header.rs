@@ -1,21 +1,11 @@
 use byteorder::{BigEndian, ReadBytesExt};
-use failure::Fail;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::io::Read;
+use super::Error;
 
 /// Minimal size of header.
 const HEADER_SIZE: usize = 28;
-
-#[derive(Fail, Debug, PartialEq)]
-pub enum Error {
-    #[fail(display = "Wrong magic number.")]
-    MagicError,
-    #[fail(display = "Wrong version: {}, expected 1.", _0)]
-    Version(u16),
-    #[fail(display = "Header too small: {} bytes, expected 28.", _0)]
-    HeaderTooSmall(u16),
-}
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ChecksumAlg {
