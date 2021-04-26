@@ -1,10 +1,7 @@
 use crate::header::Header;
 use crate::toc::Toc;
-use crate::*;
-use libflate::zlib::Decoder;
 use std::fmt;
-use std::io::SeekFrom;
-use std::io::{Read, Seek};
+use std::io::Read;
 use super::Error;
 
 #[derive(Debug, Clone)]

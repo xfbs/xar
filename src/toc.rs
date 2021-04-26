@@ -2,7 +2,7 @@ use chrono::NaiveDateTime;
 use libflate::zlib::Decoder;
 use std::fmt;
 use std::io::{Read, Write};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use xmltree::Element;
 use super::Error;
 
@@ -165,7 +165,6 @@ impl FileElement {
     }
 
     pub fn error(&self) -> Error {
-        use FileElement::*;
         match self {
             _ => Error::FileTypeElementMissing,
         }
@@ -196,7 +195,6 @@ impl FileDataElement {
     }
 
     pub fn error(&self) -> Error {
-        use FileElement::*;
         match self {
             _ => Error::FileTypeElementMissing,
         }
@@ -265,24 +263,23 @@ impl FileAttr {
 
         use FileElement::*;
         match e {
-            Group => Self::parse_text(e, child, &mut self.group),
-            User => Self::parse_text(e, child, &mut self.user),
-            Name => Self::parse_text(e, child, &mut self.name),
-            Type => Self::parse_type(e, child, &mut self.ftype),
-            Data => self.parse_dummy(child),
-            CTime => self.parse_dummy(child),
-            MTime => self.parse_dummy(child),
-            ATime => self.parse_dummy(child),
+            Group => Self::parse_text(child, &mut self.group),
+            User => Self::parse_text(child, &mut self.user),
+            Name => Self::parse_text(child, &mut self.name),
+            Type => Self::parse_type(child, &mut self.ftype),
+            Data => self.parse_dummy(),
+            CTime => self.parse_dummy(),
+            MTime => self.parse_dummy(),
+            ATime => self.parse_dummy(),
             GID => Self::parse_usize(e, child, &mut self.gid),
             UID => Self::parse_usize(e, child, &mut self.uid),
-            Mode => self.parse_dummy(child),
+            Mode => self.parse_dummy(),
             INode => Self::parse_usize(e, child, &mut self.inode),
             DeviceNo => Self::parse_usize(e, child, &mut self.deviceno),
         }
     }
 
     fn parse_text(
-        element: FileElement,
         child: &Element,
         text: &mut Option<String>,
     ) -> Result<(), Error> {
@@ -291,7 +288,6 @@ impl FileAttr {
     }
 
     fn parse_type(
-        element: FileElement,
         child: &Element,
         ftype: &mut Option<FileType>,
     ) -> Result<(), Error> {
@@ -319,7 +315,7 @@ impl FileAttr {
         Ok(())
     }
 
-    fn parse_dummy(&mut self, child: &Element) -> Result<(), Error> {
+    fn parse_dummy(&mut self) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -375,9 +371,8 @@ impl<'a> Files<'a> {
     }
 
     pub fn find(&self, path: &Path) -> Option<Files> {
-        let mut files: Option<Files> = Some(self.clone());
-
-        files
+        // TODO: Implement this
+        Some(self.clone())
     }
 }
 
